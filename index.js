@@ -2,11 +2,8 @@
 
 // TODO: -- add an option to do a snapshot every X time, copy the whole data folder,
 // TODO: -- and allow a backup system to be made, for ex: tell where the backup should be copied
-const config = {
-    password: "",
-    data_dir: "./data/",
-    app_dir: __dirname
-};
+const config = require("./config");
+
 global.XStorage = new (require("./libs/fs/Storage"))(config.app_dir + "/" + config.data_dir + "/files/");
 global.XDB = new (require("./libs/DB"))(config.app_dir + "/" + config.data_dir + "db/");
 const SyncServer = require("./libs/server");
