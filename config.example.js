@@ -7,10 +7,10 @@ module.exports = {
     "port": 3000,
 
     // optional, enables https
-    "certs": {
-        "pk": "./certs/privkey.pem",
-        "cert": "./certs/fullchain.pem"
-    },
+    // "certs": {
+    //     "pk": "./certs/privkey.pem",
+    //     "cert": "./certs/fullchain.pem"
+    // },
 
     // cleanup
     cleanup: {
