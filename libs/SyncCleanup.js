@@ -24,7 +24,6 @@ module.exports = class SyncCleanup {
 
         // make sure all devices are synced before deleting
         let now = (new Date()).getTime();
-        console.log(this.config.cleanup.keep_deleted_files_time);
         for(let item of items) {
             try {
                 let metadata = await XStorage.readMetadata(item);
