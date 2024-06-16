@@ -158,7 +158,7 @@ module.exports = class Server {
                         path: localFile,
                         action: metadata.action,
                         mtime: 0
-                    }, peer);
+                    }, packet);
                 }
             }
 
