@@ -219,8 +219,8 @@ module.exports = class Server {
             switch (data.metadata.action) {
                 case "created":
                     await XStorage.writeMetadata(data.path, data.metadata);
-                    if (data.metadata.type == "file" && data.data) {
-                        await XStorage.write(data.path, data.data);
+                    if (data.metadata.type == "file") {
+                        await XStorage.write(data.path, data.data || "");
                     }
                     break
                 case "deleted":

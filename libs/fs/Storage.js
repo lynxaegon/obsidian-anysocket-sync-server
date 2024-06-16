@@ -23,9 +23,6 @@ module.exports = class Storage {
         if(!metadata || metadata.type == "folder") {
             return null;
         }
-        if(metadata.type == "file") {
-            return "";
-        }
 
 		return await this.fsVault.read(path + "/" + metadata.mtime);
 	}

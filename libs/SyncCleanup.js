@@ -25,20 +25,25 @@ module.exports = class SyncCleanup {
         // make sure all devices are synced before deleting
         let now = (new Date()).getTime();
         for(let item of items) {
-            let metadata = await XStorage.readMetadata(item);
-            switch (metadata.action) {
-                case "created":
-                    let versions = await XStorage.iterateVersions(item);
-                    let deleteableVersions = versions.slice(this.config.cleanup.versions_per_file);
-                    for(let item of deleteableVersions) {
-                        await XStorage.delete(item.path);
-                    }
-                    break;
-                case "deleted":
-                    if (metadata.mtime + this.config.cleanup.keep_deleted_files_time < now && allDevicesLastOnline > metadata.mtime) {
-                        await XStorage.delete(item);
-                    }
-                    break;
+            try {
+                let metadata = await XStorage.readMetadata(item);
+                switch (metadata.action) {
+                    case "created":
+                        let versions = await XStorage.iterateVersions(item);
+                        let deleteableVersions = versions.slice(this.config.cleanup.versions_per_file);
+                        for (let item of deleteableVersions) {
+                            await XStorage.delete(item.path);
+                        }
+                        break;
+                    case "deleted":
+                        if (metadata.mtime + this.config.cleanup.keep_deleted_files_time < now && allDevicesLastOnline > metadata.mtime) {
+                            await XStorage.delete(item);
+                        }
+                        break;
+                }
+            }
+            catch(e) {
+                console.log("[Error SyncCleanup]", e);
             }
         }
     }
