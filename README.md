@@ -14,3 +14,8 @@ _Important: **Always backup your vault!**_
 3. Update the configuration
 4. `node index.js`
 5. Enjoy!
+
+
+## License
+
+MIT
