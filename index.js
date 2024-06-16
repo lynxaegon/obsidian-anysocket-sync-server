@@ -1,9 +1,10 @@
-// TODO: - check why XLSX files don't work over e2e :/
+// TODO: - BUG: check why XLSX files don't work over e2e :/
+// TODO: - IDEA: Backups/Snapshots every X time
+// TODO: - IDEA: Version history
+// TODO: - IDEA: Server settings in Obsidian
+// TODO: - IDEA: Server commands in Obsidian (cleanup)
 
-// TODO: -- add an option to do a snapshot every X time, copy the whole data folder,
-// TODO: -- and allow a backup system to be made, for ex: tell where the backup should be copied
 const config = require("./config");
-
 global.XStorage = new (require("./libs/fs/Storage"))(config.app_dir + "/" + config.data_dir + "/files/");
 global.XDB = new (require("./libs/DB"))(config.app_dir + "/" + config.data_dir + "db/");
 const SyncServer = require("./libs/server");

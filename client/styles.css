@@ -1,8 +1,90 @@
-/*
+.anysocket-files-history .item-path {
+	font-size: var(--font-ui-medium);
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.anysocket-files-history .item-metadata {
+	font-size: var(--font-ui-smaller);
+	padding: var(--size-4-1) var(--size-4-2) 0;
+}
 
-If your plugin does not need CSS, delete this file.
+.anysocket-version-history {
+	padding: 0;
+	width: var(--modal-width);
+	height: var(--modal-height);
+	max-width: var(--modal-max-width);
+	max-height: var(--modal-max-height);
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+}
+	.anysocket-version-history .modal-content {
+		display: flex;
+	}
 
-*/
+		.anysocket-version-history .modal-content .history-list {
+			padding: var(--size-4-2) var(--size-4-2) 0;
+			display: flex;
+			flex-direction: column;
+			flex-basis: 250px;
+			flex-shrink: 0;
+			border-inline-end: 1px solid var(--background-modifier-border);
+			background-color: var(--background-secondary);
+		}
+
+			.anysocket-version-history .modal-content .version-timestamp {
+				padding: var(--size-4-2) var(--size-2-2) var(--size-4-2) var(--size-4-4);
+				margin-bottom: var(--size-2-1);
+				border-radius: var(--radius-s);
+				font-size: var(--font-ui-medium);
+				line-height: var(--line-height-tight);
+				color: var(--nav-item-color);
+				font-variant: tabular-nums;
+			}
+
+			.anysocket-version-history .modal-content .version-timestamp:hover {
+				background-color: var(--nav-item-background-active);
+				color: var(--nav-item-color-active);
+			}
+
+			.anysocket-version-history .modal-content .version-timestamp.active {
+				background-color: var(--nav-item-background-active);
+				color: var(--nav-item-color-active);
+			}
+
+		.anysocket-version-history .modal-content .version-container {
+			background-color: var(--background-primary);
+			padding: 0;
+			height: auto;
+			display: flex;
+			flex-direction: column;
+			width: 0;
+			flex: 1 1 auto;
+		}
+
+			.anysocket-version-history .modal-content .version-content {
+				display: flex;
+				flex-direction: column;
+				flex-grow: 1;
+				overflow: hidden;
+				padding: 0;
+			}
+
+			.anysocket-version-history .modal-content .version-titlebar {
+				display: flex;
+				align-items: center;
+				padding: var(--size-4-2) var(--size-4-4);
+				border-bottom: 1px solid var(--background-modifier-border);
+			}
+
+			.anysocket-version-history .modal-content .version-filename {
+				font-size: var(--font-ui-medium);
+				font-weight: var(--file-header-font-weight);
+				flex-grow: 1;
+			}
+
+			.anysocket-version-history .modal-content .version-actions {
+				display: flex;
+				align-items: center;
+				gap: var(--size-4-1);
+				padding-inline-end: var(--size-4-8);
+			}

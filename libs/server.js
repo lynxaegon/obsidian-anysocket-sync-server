@@ -3,11 +3,7 @@ const AnySocket = require("anysocket");
 const Helpers = require("./helpers");
 const fs = require("fs");
 const DEBUG = true;
-process.on('unhandledRejection', (reason, p) => {
-    console.log('Unhandled Rejection at: Promise', p, 'reason:', reason);
-    console.log('stacktrace', (new Error()).stack)
-    // application specific logging, throwing an error, or other logic here
-});
+
 module.exports = class Server {
     constructor(config) {
         this.config = config;
@@ -52,15 +48,22 @@ module.exports = class Server {
             if(packet.msg == null)
                 return;
 
+            if(!packet.peer.data || !packet.peer.data.id) {
+                return packet.peer.disconnect();
+            }
+
             switch (packet.msg.type) {
                 case "sync":
-                    this.onSync(packet.msg.data, packet.peer);
+                    this.onSync(packet.msg.data, packet);
                     break;
                 case "file_event":
-                    this.onFileEvent(packet.msg.data, packet.peer);
+                    this.onFileEvent(packet.msg.data, packet);
                     break;
                 case "file_data":
-                    this.onFileData(packet.msg.data, packet.peer);
+                    this.onFileData(packet.msg.data, packet);
+                    break;
+                case "file_history":
+                    this.onFileHistory(packet.msg.data, packet);
                     break;
             }
         })
@@ -107,7 +110,26 @@ module.exports = class Server {
         }
     }
 
-    async onSync(data, peer) {
+    async checkFile(otherMetadata) {
+        const metadata = await XStorage.readMetadata(otherMetadata.path);
+
+        if (!metadata) {
+            return -1;
+        } else {
+            if (metadata.sha1 !== otherMetadata.sha1 || metadata.action !== otherMetadata.action) {
+                if (otherMetadata.mtime > metadata.mtime) {
+                    // request file upload
+                    return -1;
+                } else if (otherMetadata.mtime < metadata.mtime) {
+                    // request file download
+                    return 1;
+                }
+            }
+        }
+        return 0;
+    }
+
+    async onSync(data, packet) {
         try {
             DEBUG && console.log("[SYNC]", data);
             const files = await XStorage.iterate();
@@ -121,7 +143,7 @@ module.exports = class Server {
                 if (foundItem) {
                     // if server & client have the item, compare it as a FileEvent
                     foundItem.metadata.path = foundItem.path;
-                    this.onFileEvent(foundItem.metadata, peer);
+                    this.onFileEvent(foundItem.metadata, packet);
                 } else {
                     let metadata = (await XStorage.readMetadata(localFile));
                     if (metadata.action == "deleted") {
@@ -145,14 +167,14 @@ module.exports = class Server {
                 }
 
                 item.metadata.path = item.path;
-                this.onFileEvent(item.metadata, peer);
+                this.onFileEvent(item.metadata, packet);
             }
         } catch (e) {
             console.error("ERROR:", e);
         }
     }
 
-    async onFileEvent(data, peer) {
+    async onFileEvent(data, packet) {
         const metadata = await XStorage.readMetadata(data.path);
         let fileResult = await this.checkFile(data);
         DEBUG && console.log("[FileEvent]", data);
@@ -160,7 +182,7 @@ module.exports = class Server {
 
         // request from client
         if (fileResult == -1) {
-            peer.send({
+            packet.peer.send({
                 type: "file_data",
                 data: {
                     type: "send",
@@ -170,7 +192,7 @@ module.exports = class Server {
         }
         // send to client
         else if (fileResult == 1) {
-            peer.send({
+            packet.peer.send({
                 type: "file_data",
                 data: {
                     type: "apply",
@@ -182,30 +204,11 @@ module.exports = class Server {
         }
     }
 
-    async checkFile(otherMetadata) {
-        const metadata = await XStorage.readMetadata(otherMetadata.path);
-
-        if (!metadata) {
-            return -1;
-        } else {
-            if (metadata.sha1 !== otherMetadata.sha1 || metadata.action !== otherMetadata.action) {
-                if (otherMetadata.mtime > metadata.mtime) {
-                    // request file upload
-                    return -1;
-                } else if (otherMetadata.mtime < metadata.mtime) {
-                    // request file download
-                    return 1;
-                }
-            }
-        }
-        return 0;
-    }
-
-    async onFileData(data, peer) {
+    async onFileData(data, packet) {
         DEBUG && console.log("[FileData]", data);
 
         if (data.type == "send") {
-            peer.send({
+            packet.peer.send({
                 type: "file_data",
                 data: {
                     type: "apply",
@@ -229,9 +232,7 @@ module.exports = class Server {
 
             peerList.map(async (other) => {
                 try {
-                    console.log(other.id, peer.id);
-                    if (other.id != peer.id) {
-                        console.log("sent", data);
+                    if (other.id != packet.peer.id) {
                         other.send({
                             type: "file_data",
                             data: data
@@ -241,6 +242,47 @@ module.exports = class Server {
                     console.log("broadcast error", e);
                 }
             });
+        }
+    }
+
+    async onFileHistory(data, packet) {
+        DEBUG && console.log("[FileHistory]", data);
+        switch (data.type) {
+            case "list_versions":
+                let versions = await XStorage.iterateVersions(data.path);
+                packet.reply({
+                    deleted: (await XStorage.readMetadata(data.path)).action == "deleted",
+                    data: versions.map(v => v.timestamp)
+                })
+                break;
+            case "list_files":
+                let files = [];
+                let items = await XStorage.iterate();
+                for(let item of items) {
+                    let metadata = await XStorage.readMetadata(item);
+                    if(metadata.type != "file") {
+                        continue;
+                    }
+
+                    let shouldAdd = true;
+                    if(data.mode == "deleted" && metadata.action != "deleted") {
+                        shouldAdd = false;
+                    }
+
+                    if(shouldAdd) {
+                        files.push({
+                            path: item,
+                            mtime: metadata.mtime
+                        });
+                    }
+                }
+                packet.reply(files);
+                break;
+            case "read":
+                packet.reply(await XStorage.readExact(data.path + "/" + data.timestamp));
+                break;
+            default:
+                console.log("[FileHistory]", "type", data.type, "NOT IMPLEMENTED");
         }
     }
 }

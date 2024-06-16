@@ -30,6 +30,10 @@ module.exports = class Storage {
 		return await this.fsVault.read(path + "/" + metadata.mtime);
 	}
 
+    async readExact(path) {
+        return await this.fsVault.read(path);
+    }
+
 	async delete(path) {
         return await this.fsVault.delete(path);
 	}
