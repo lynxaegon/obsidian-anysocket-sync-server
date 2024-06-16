@@ -22,8 +22,7 @@ module.exports = class SyncCleanup {
         let allDevicesLastOnline = this.findMinLastOnline();
         let items = await XStorage.iterate();
 
-        // cleanup deleted files/folders older than 7 days,
-        // but make sure all devices are synced before deleting
+        // make sure all devices are synced before deleting
         let now = (new Date()).getTime();
         for(let item of items) {
             let metadata = await XStorage.readMetadata(item);
