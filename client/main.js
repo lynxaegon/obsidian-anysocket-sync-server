@@ -874,7 +874,7 @@ var AnySocketSyncPlugin = class extends import_obsidian6.Plugin {
   constructor() {
     super(...arguments);
     this.VERSION = "1.0.0";
-    this.BUILD = "1718567149496";
+    this.BUILD = "1718568704447";
     this.isLoading = false;
   }
   async onload() {

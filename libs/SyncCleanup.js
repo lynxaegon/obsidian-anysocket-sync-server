@@ -5,7 +5,7 @@ module.exports = class SyncCleanup {
         this.config = config;
 
         // convert from seconds to ms
-        this.config.cleanup.keep_deleted_files *= 1000;
+        this.config.cleanup.keep_deleted_files_time *= 1000;
 
         this.setup();
     }
@@ -24,6 +24,7 @@ module.exports = class SyncCleanup {
 
         // make sure all devices are synced before deleting
         let now = (new Date()).getTime();
+        console.log(this.config.cleanup.keep_deleted_files_time);
         for(let item of items) {
             try {
                 let metadata = await XStorage.readMetadata(item);
