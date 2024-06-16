@@ -1,18 +1,18 @@
 const cron = require("node-cron");
 
-const KEEP_VERSION_HISTORY_COUNT_PER_FILE = 100;
-const KEEP_DELETED_HISTORY_TIMESTAMP = 24 * 60 * 60 * 1000;
-
 module.exports = class SyncCleanup {
     constructor(config) {
         this.config = config;
+
+        // convert from seconds to ms
+        this.config.cleanup.keep_deleted_files *= 1000;
 
         this.setup();
     }
 
     // https://crontab.guru/
     setup() {
-        cron.schedule("0 * * * *", async () => {
+        cron.schedule(this.config.cleanup.schedule, async () => {
             await this.run();
         });
         this.run();
@@ -30,13 +30,13 @@ module.exports = class SyncCleanup {
             switch (metadata.action) {
                 case "created":
                     let versions = await XStorage.iterateVersions(item);
-                    let deleteableVersions = versions.slice(KEEP_VERSION_HISTORY_COUNT_PER_FILE);
+                    let deleteableVersions = versions.slice(this.config.cleanup.versions_per_file);
                     for(let item of deleteableVersions) {
                         await XStorage.delete(item.path);
                     }
                     break;
                 case "deleted":
-                    if (metadata.mtime + KEEP_DELETED_HISTORY_TIMESTAMP < now && allDevicesLastOnline > metadata.mtime) {
+                    if (metadata.mtime + this.config.cleanup.keep_deleted_files_time < now && allDevicesLastOnline > metadata.mtime) {
                         await XStorage.delete(item);
                     }
                     break;

@@ -18,13 +18,15 @@ module.exports = class Server {
 
 
         // HTTPS
-        this.server.listen("http", {
-            key: "./certs/privkey.pem",
-            cert: "./certs/fullchain.pem",
-            port: 3000,
-            host: "0.0.0.0"
-        });
-        this.server.listen("ws", 3000);
+        if(this.config.certs) {
+            this.server.listen("http", {
+                key: this.config.certs.pk,
+                cert: this.config.certs.cert,
+                port: this.config.port,
+                host: this.config.host
+            });
+        }
+        this.server.listen("ws", this.config.port);
 
 
         this.server.on("connected", (peer) => {

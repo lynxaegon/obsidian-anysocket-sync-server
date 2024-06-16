@@ -2,7 +2,7 @@ const fs = require("fs");
 
 module.exports = class DB {
     constructor(root) {
-        this.path = root + "data.json";
+        this.path = root + "/data.json";
         if(!fs.existsSync(root)) {
             fs.mkdirSync(root, {
                 recursive: true
