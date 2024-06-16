@@ -148,10 +148,6 @@ module.exports = class Server {
                     this.onFileEvent(foundItem.metadata, packet);
                 } else {
                     let metadata = (await XStorage.readMetadata(localFile));
-                    if (metadata.action == "deleted") {
-                        // if only the server has the deleted item, ignore
-                        continue;
-                    }
 
                     // if only the server has the item
                     this.onFileEvent({
