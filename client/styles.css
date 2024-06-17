@@ -1,3 +1,6 @@
+.anysocket-ribbon-icon.offline {
+	color: red;
+}
 .anysocket-files-history .item-path {
 	font-size: var(--font-ui-medium);
 }
