@@ -6,7 +6,7 @@
 	"author": "Andrei Vaduva <andrei.vaduva@gmail.com>",
 	"license": "MIT",
 	"dependencies": {
-		"anysocket": "^0.4.19",
+		"anysocket": "^0.4.21",
 		"node-cron": "^3.0.3"
 	}
 }
