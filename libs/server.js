@@ -2,7 +2,7 @@ let peerList = [];
 const AnySocket = require("anysocket");
 const Helpers = require("./helpers");
 const fs = require("fs");
-const DEBUG = true;
+const DEBUG = false;
 
 module.exports = class Server {
     constructor(config) {
@@ -190,13 +190,17 @@ module.exports = class Server {
         }
         // send to client
         else if (fileResult == 1) {
+            let isBinary = Helpers.isBinary(data.path);
             packet.peer.send({
                 type: "file_data",
                 data: {
                     type: "apply",
+                    binary: isBinary,
                     path: data.path,
                     metadata: metadata,
-                    data: await XStorage.read(data.path)
+                    data: isBinary ?
+                        AnySocket.Packer.pack(await XStorage.read(data.path, true)) :
+                        await XStorage.read(data.path)
                 }
             });
         }
@@ -206,11 +210,15 @@ module.exports = class Server {
         DEBUG && console.log("[FileData]", data);
 
         if (data.type == "send") {
+            let isBinary = Helpers.isBinary(data.path);
             packet.peer.send({
                 type: "file_data",
                 data: {
                     type: "apply",
-                    data: await XStorage.read(data.path),
+                    binary: isBinary,
+                    data: isBinary ?
+                        AnySocket.Packer.pack(await XStorage.read(data.path, true)) :
+                        await XStorage.read(data.path),
                     path: data.path,
                     metadata: await XStorage.readMetadata(data.path)
                 }
@@ -220,7 +228,12 @@ module.exports = class Server {
                 case "created":
                     await XStorage.writeMetadata(data.path, data.metadata);
                     if (data.metadata.type == "file") {
-                        await XStorage.write(data.path, data.data || "");
+                        if(data.binary) {
+                            await XStorage.write(data.path, AnySocket.Packer.unpack(data.data) || null, true);
+                        }
+                        else {
+                            await XStorage.write(data.path, data.data || "");
+                        }
                     }
                     break
                 case "deleted":
@@ -277,8 +290,19 @@ module.exports = class Server {
                 packet.reply(files);
                 break;
             case "read":
-                packet.reply(await XStorage.readExact(data.path + "/" + data.timestamp));
+                if(data.binary) {
+                    console.log("sending binary");
+                    console.log(await XStorage.readExact(data.path + "/" + data.timestamp, true));
+                    packet.reply(
+                        AnySocket.Packer.pack(await XStorage.readExact(data.path + "/" + data.timestamp, true))
+                    );
+                }
+                else {
+                    console.log("sending normal");
+                    packet.reply(await XStorage.readExact(data.path + "/" + data.timestamp));
+                }
                 break;
+
             default:
                 console.log("[FileHistory]", "type", data.type, "NOT IMPLEMENTED");
         }

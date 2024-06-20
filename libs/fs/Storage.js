@@ -10,25 +10,31 @@ module.exports = class Storage {
         await this.fsVault.init();
     }
 
-	async write(path, data) {
+	async write(path, data, binary) {
         let metadata = await this.readMetadata(path);
         if(!metadata) {
             return null;
         }
-		return await this.fsVault.write(path + "/" + metadata.mtime, data);
+
+        // don't keep version history for binary files
+        if(binary) {
+            (await this.fsVault.iterateVersions(path)).map(async item => await this.fsVault.delete(item.path));
+        }
+
+		return await this.fsVault.write(path + "/" + metadata.mtime, data, binary);
 	}
 
-	async read(path) {
+	async read(path, binary = false) {
         let metadata = await this.readMetadata(path);
         if(!metadata || metadata.type == "folder") {
             return null;
         }
 
-		return await this.fsVault.read(path + "/" + metadata.mtime);
+		return await this.fsVault.read(path + "/" + metadata.mtime, binary);
 	}
 
-    async readExact(path) {
-        return await this.fsVault.read(path);
+    async readExact(path, binary) {
+        return await this.fsVault.read(path, binary);
     }
 
 	async delete(path) {
@@ -47,7 +53,7 @@ module.exports = class Storage {
 	}
 
 	async writeMetadata(path, metadata) {
-        await this.fsVault.write(path + "/metadata", JSON.stringify(metadata));
+        return await this.fsVault.write(path + "/metadata", JSON.stringify(metadata));
 	}
 
     async iterate() {

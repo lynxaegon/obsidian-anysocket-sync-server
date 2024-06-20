@@ -13,7 +13,7 @@ module.exports = class FSAdapter {
         });
     }
 
-    async write(path, data) {
+    async write(path, data, binary) {
         if (!await this.exists(path)) {
             let folder = path.split("/").slice(0, -1).join("/");
             if (folder) {
@@ -25,13 +25,22 @@ module.exports = class FSAdapter {
             }
         }
 
-        await fs.writeFile(this.basePath + path, data, "utf-8");
+        if(binary) {
+            await fs.writeFile(this.basePath + path, data);
+        }
+        else {
+            await fs.writeFile(this.basePath + path, data, "utf8");
+        }
+
         return data;
     }
 
-    async read(path) {
+    async read(path, binary) {
         try {
-            return await fs.readFile(this.basePath + path, "utf-8");
+            if(binary) {
+                return await fs.readFile(this.basePath + path);
+            }
+            return await fs.readFile(this.basePath + path, "utf8");
         } catch (e) {
             return null;
         }

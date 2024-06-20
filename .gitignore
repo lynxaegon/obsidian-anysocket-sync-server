@@ -2,6 +2,7 @@ backup/
 data/
 node_modules/
 certs/
+tools/
 tests/
 package-lock.json
 config.js
