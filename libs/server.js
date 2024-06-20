@@ -291,14 +291,12 @@ module.exports = class Server {
                 break;
             case "read":
                 if(data.binary) {
-                    console.log("sending binary");
                     console.log(await XStorage.readExact(data.path + "/" + data.timestamp, true));
                     packet.reply(
                         AnySocket.Packer.pack(await XStorage.readExact(data.path + "/" + data.timestamp, true))
                     );
                 }
                 else {
-                    console.log("sending normal");
                     packet.reply(await XStorage.readExact(data.path + "/" + data.timestamp));
                 }
                 break;
