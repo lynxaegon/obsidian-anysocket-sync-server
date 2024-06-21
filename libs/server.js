@@ -2,7 +2,7 @@ let peerList = [];
 const AnySocket = require("anysocket");
 const Helpers = require("./helpers");
 const fs = require("fs");
-const DEBUG = false
+const DEBUG = false;
 
 module.exports = class Server {
     constructor(config) {
@@ -297,8 +297,10 @@ module.exports = class Server {
                 packet.reply(files);
                 break;
             case "read":
+                if(!data.timestamp) {
+                    return packet.reply(await XStorage.read(data.path));
+                }
                 if(data.binary) {
-                    console.log(await XStorage.readExact(data.path + "/" + data.timestamp, true));
                     packet.reply(
                         AnySocket.Packer.pack(await XStorage.readExact(data.path + "/" + data.timestamp, true))
                     );
