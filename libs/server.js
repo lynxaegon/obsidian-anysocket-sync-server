@@ -31,10 +31,13 @@ module.exports = class Server {
 
         this.server.on("connected", (peer) => {
             console.log("[SERVER][" + peer.id + "] Connected");
-            peerList.push(peer);
+            peer._noDeviceTimeout = setTimeout(() => {
+                peer.disconnect("No device name sent...");
+            }, 5000);
         });
         this.server.rpc = {
             setDeviceId: (id, peer) => {
+                clearTimeout(peer._noDeviceTimeout);
                 console.log("[SERVER][" + peer.id + "] Device Id:", id);
                 if (!peer.data)
                     peer.data = {};
@@ -42,6 +45,7 @@ module.exports = class Server {
                 peer.data.id = id;
                 XDB.devices.add(id);
                 XDB.devices.set(id, "last_online", (new Date()).getTime());
+                peerList.push(peer);
             },
             onVersionCheck: this.onVersionCheck.bind(this)
         }
