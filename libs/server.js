@@ -2,7 +2,7 @@ let peerList = [];
 const AnySocket = require("anysocket");
 const Helpers = require("./helpers");
 const fs = require("fs");
-const DEBUG = false;
+const DEBUG = false
 
 module.exports = class Server {
     constructor(config) {
@@ -279,9 +279,12 @@ module.exports = class Server {
                         continue;
                     }
 
-                    let shouldAdd = true;
-                    if(data.mode == "deleted" && metadata.action != "deleted") {
-                        shouldAdd = false;
+                    let shouldAdd = false;
+                    if(data.mode != "deleted" && metadata.action != "deleted") {
+                        shouldAdd = true;
+                    }
+                    else if(data.mode == "deleted" && metadata.action == "deleted") {
+                        shouldAdd = true;
                     }
 
                     if(shouldAdd) {
