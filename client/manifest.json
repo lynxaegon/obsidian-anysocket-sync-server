@@ -6,6 +6,5 @@
 	"description": "Self-Hosted synchronization for you Vault using AnySocket",
 	"author": "Andrei Vaduva",
 	"authorUrl": "https://github.com/lynxaegon",
-	"fundingUrl": "https://github.com/lynxaegon",
 	"isDesktopOnly": false
 }

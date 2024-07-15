@@ -5320,7 +5320,7 @@ var AnySocketSyncPlugin = class extends import_obsidian7.Plugin {
   constructor() {
     super(...arguments);
     this.VERSION = "1.1.1";
-    this.BUILD = "1719127605893";
+    this.BUILD = "1721070232449";
     this.isLoading = false;
   }
   async onload() {
