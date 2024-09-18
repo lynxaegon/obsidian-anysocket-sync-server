@@ -17,9 +17,9 @@ _Important: **Always backup your vault!**_
 
 
 ## Docker Setup
-- /app/data
+- `/app/data`
   - the location where vault data will be on disk
-- /app/config.js
+- `/app/config.js`
   - the location of the config required to run the `server`
 
 
