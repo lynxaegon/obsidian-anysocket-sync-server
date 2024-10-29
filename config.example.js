@@ -12,6 +12,14 @@ module.exports = {
     //     "cert": "./certs/fullchain.pem"
     // },
 
+    logs: {
+        // 0 - disabled
+        // 1 - connect/disconnect only
+        // 2 - client/server updates (paths only)
+        // 3 - verbose
+        level: 1
+    },
+
     // cleanup
     cleanup: {
         // crontab format

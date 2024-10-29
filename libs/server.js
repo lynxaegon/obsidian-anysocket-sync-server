@@ -2,11 +2,14 @@ let peerList = [];
 const AnySocket = require("anysocket");
 const Helpers = require("./helpers");
 const fs = require("fs");
-const DEBUG = false;
 
 module.exports = class Server {
     constructor(config) {
         this.config = config;
+        this.debug = 1;
+        if(config.logs && config.logs.level) {
+            this.debug = config.logs.level;
+        }
 
         this.server = new AnySocket();
         this.server.onAuth = (packet) => {
@@ -30,17 +33,23 @@ module.exports = class Server {
 
 
         this.server.on("connected", (peer) => {
-            console.log("[SERVER][" + peer.id + "] Connected");
+            this.debug >= 1 && console.log("[SERVER][" + peer.id + "] Connected");
             peer._noDeviceTimeout = setTimeout(() => {
                 peer.disconnect("No device name sent...");
             }, 5000);
         });
         this.server.rpc = {
+            autoSync: (value, peer) => {
+                peer.data.autoSync = value;
+            },
             setDeviceId: (id, peer) => {
                 clearTimeout(peer._noDeviceTimeout);
-                console.log("[SERVER][" + peer.id + "] Device Id:", id);
-                if (!peer.data)
-                    peer.data = {};
+                this.debug >= 1 && console.log("[SERVER][" + peer.id + "] Device Id:", id);
+                if (!peer.data) {
+                    peer.data = {
+                        autoSync: true // default
+                    };
+                }
 
                 peer.data.id = id;
                 XDB.devices.add(id);
@@ -75,7 +84,8 @@ module.exports = class Server {
         })
 
         this.server.on("disconnected", (peer, reason) => {
-            console.log("[SERVER][" + peer.id + "] Disconnected", reason);
+            clearTimeout(peer._noDeviceTimeout);
+            this.debug >= 1 && console.log("[SERVER][" + peer.id + "] Disconnected", reason);
             peerList = peerList.filter((item) => item.id != peer.id);
 
             if (peer.data && peer.data.id) {
@@ -91,13 +101,14 @@ module.exports = class Server {
                 type: "ok"
             };
         } else {
-            console.log("== Client updated from:",
+            this.debug >= 1 && console.log("== Client updated from:",
                 version, "(build: " + build + ")",
                 "to:", BUILD_INFO.version, "(build: " + BUILD_INFO.build + ")");
 
             return {
                 type: "update",
                 version: BUILD_INFO.version,
+                build: BUILD_INFO.build,
                 files: [
                     {
                         path: "main.js",
@@ -136,8 +147,16 @@ module.exports = class Server {
     }
 
     async onSync(data, packet) {
+        if(packet.peer.data.syncing) {
+            this.debug >= 1 && console.log("[SERVER][" + packet.peer.data.id + "] Sync already in progress...");
+            return;
+        }
+        this.debug >= 2 && console.log("[SERVER][" + packet.peer.data.id + "] Started sync");
+        packet.peer.data.syncing = true;
+        packet.peer.data.files = {};
+
         try {
-            DEBUG && console.log("[SYNC]", data);
+            this.debug >= 3 && console.log("[SYNC]", data);
             const files = await XStorage.iterate();
             const processedFiles = {};
 
@@ -149,12 +168,12 @@ module.exports = class Server {
                 if (foundItem) {
                     // if server & client have the item, compare it as a FileEvent
                     foundItem.metadata.path = foundItem.path;
-                    this.onFileEvent(foundItem.metadata, packet);
+                    packet.peer.data.files[foundItem.path] = await this.onFileEvent(foundItem.metadata, packet);
                 } else {
                     let metadata = (await XStorage.readMetadata(localFile));
 
                     // if only the server has the item
-                    this.onFileEvent({
+                    packet.peer.data.files[localFile] = await this.onFileEvent({
                         path: localFile,
                         action: metadata.action,
                         mtime: 0
@@ -169,18 +188,42 @@ module.exports = class Server {
                 }
 
                 item.metadata.path = item.path;
-                this.onFileEvent(item.metadata, packet);
+                packet.peer.data.files[item.path] = await this.onFileEvent(item.metadata, packet);
             }
+            // filter null items
         } catch (e) {
             console.error("ERROR:", e);
         }
+
+        for(let path in packet.peer.data.files) {
+            if(packet.peer.data.files[path] == null || packet.peer.data.files[path] == "server_newer") {
+                delete packet.peer.data.files[path];
+            }
+        }
+
+        await this.onSyncCompleted(packet.peer);
+    }
+
+    async onSyncCompleted(peer) {
+        if(peer.data.syncing == false)
+            return;
+
+        if (Object.keys(peer.data.files).length > 0) {
+            return;
+        }
+
+        this.debug >= 2 && console.log("[SERVER][" + peer.data.id + "] Sync completed");
+        peer.data.syncing = false;
+        peer.send({
+            type: "sync_complete"
+        });
     }
 
     async onFileEvent(data, packet) {
         const metadata = await XStorage.readMetadata(data.path);
         let fileResult = await this.checkFile(data);
-        DEBUG && console.log("[FileEvent]", data);
-        DEBUG && console.log("[CheckFileResult]", fileResult);
+        this.debug >= 3 && console.log("[FileEvent]", data);
+        this.debug >= 3 && console.log("[CheckFileResult]", fileResult);
 
         // request from client
         if (fileResult == -1) {
@@ -191,6 +234,7 @@ module.exports = class Server {
                     path: data.path
                 }
             });
+            return "client_newer";
         }
         // send to client
         else if (fileResult == 1) {
@@ -207,11 +251,15 @@ module.exports = class Server {
                         await XStorage.read(data.path)
                 }
             });
+            this.debug >= 2 && console.log("[SERVER][" + packet.peer.data.id + "] Updating client:", data.path);
+            return "server_newer";
         }
+
+        return null;
     }
 
     async onFileData(data, packet) {
-        DEBUG && console.log("[FileData]", data);
+        this.debug >= 3 && console.log("[FileData]", data);
 
         if (data.type == "send") {
             let isBinary = Helpers.isBinary(data.path);
@@ -226,7 +274,7 @@ module.exports = class Server {
                     path: data.path,
                     metadata: await XStorage.readMetadata(data.path)
                 }
-            })
+            });
         } else if (data.type == "apply") {
             switch (data.metadata.action) {
                 case "created":
@@ -247,21 +295,29 @@ module.exports = class Server {
 
             peerList.map(async (other) => {
                 try {
-                    if (other.id != packet.peer.id) {
-                        other.send({
-                            type: "file_data",
-                            data: data
-                        });
+                    if(data.type == "apply" && other.data.autoSync) {
+                        if (other.id != packet.peer.id) {
+                            other.send({
+                                type: "file_data",
+                                data: data
+                            });
+                        }
                     }
                 } catch (e) {
                     console.log("broadcast error", e);
                 }
             });
+
+            this.debug >= 2 && console.log("[SERVER][" + packet.peer.data.id + "] Updating server:", data.path);
+            if(packet.peer.data.syncing) {
+                delete packet.peer.data.files[data.path];
+                await this.onSyncCompleted(packet.peer);
+            }
         }
     }
 
     async onFileHistory(data, packet) {
-        DEBUG && console.log("[FileHistory]", data);
+        this.debug >= 3 && console.log("[FileHistory]", data);
         switch (data.type) {
             case "list_versions":
                 let versions = await XStorage.iterateVersions(data.path);

@@ -1,4 +1,3 @@
-// TODO: - BUG: check why XLSX files don't work over e2e :/
 // TODO: - IDEA: Backups/Snapshots every X time
 // TODO: - IDEA: Server settings in Obsidian
 // TODO: - IDEA: Server commands in Obsidian (cleanup)
