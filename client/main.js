@@ -5541,8 +5541,8 @@ var DEFAULT_SETTINGS = {
 var AnySocketSyncPlugin = class extends import_obsidian6.Plugin {
   constructor() {
     super(...arguments);
-    this.VERSION = "1.3.0";
-    this.BUILD = "1730385753776";
+    this.VERSION = "1.3.2";
+    this.BUILD = "1730386273808";
     this.isLoading = false;
   }
   async onload() {
