@@ -4683,7 +4683,6 @@ var XNotify = class {
     }
   }
   makeNotice(color, text) {
-    console.log("XNotify: makeNotice called", { color, text });
     let notice = new import_obsidian.Notice().noticeEl;
     let container = notice.createEl("span");
     container.style.verticalAlign = "middle";
@@ -4694,7 +4693,6 @@ var XNotify = class {
     icon.style.color = color;
     icon.innerHTML = this.xSync.plugin.getSVGIcon();
     container.createEl("span", { text });
-    console.log("XNotify: makeNotice created", notice);
   }
   setFromBackground(value) {
     this.isFromBackground = value;
@@ -4758,26 +4756,14 @@ var XNotify = class {
     }
   }
   handleConnectionLost(now, notifications) {
-    console.log("XNotify: handleConnectionLost", { notifications, isConnected: this.xSync.anysocket.isConnected });
     this.cancelPendingNotification();
     if (this.statusBarIcon)
       this.statusBarIcon.style.color = STATUS_ERROR;
     this.setStatusMessage(NotifyType.CONNECTION_LOST, false);
-    console.log("XNotify: Scheduling CONNECTION_LOST notification in 2 seconds");
     this.notificationTimeout = setTimeout(() => {
-      console.log("XNotify: CONNECTION_LOST timeout fired", {
-        isConnected: this.xSync.anysocket.isConnected,
-        notifications
-      });
       if (!this.xSync.anysocket.isConnected && notifications > 0) {
-        console.log("XNotify: Showing CONNECTION_LOST notification");
         this.makeNotice(STATUS_ERROR, NotifyType.CONNECTION_LOST);
         this.connectionLostShown = true;
-      } else {
-        console.log("XNotify: Skipping CONNECTION_LOST", {
-          isConnected: this.xSync.anysocket.isConnected,
-          notifications
-        });
       }
       this.notificationTimeout = null;
     }, 2e3);
@@ -4786,35 +4772,15 @@ var XNotify = class {
   }
   handleNotConnected(now, notifications) {
     const isInitialConnection = this.lastNotification === null || this.lastNotification === NotifyType.PLUGIN_DISABLED;
-    console.log("XNotify: handleNotConnected", {
-      isInitialConnection,
-      lastNotification: this.lastNotification,
-      notifications,
-      isConnected: this.xSync.anysocket.isConnected,
-      hasPendingTimeout: !!this.notificationTimeout
-    });
     if (isInitialConnection) {
-      console.log("XNotify: Initial connection - canceling any pending and scheduling NOT_CONNECTED");
       this.cancelPendingNotification();
       this.notificationTimeout = setTimeout(() => {
-        console.log("XNotify: NOT_CONNECTED timeout fired", {
-          isConnected: this.xSync.anysocket.isConnected,
-          notifications
-        });
         if (!this.xSync.anysocket.isConnected && notifications > 0) {
-          console.log("XNotify: Showing NOT_CONNECTED notification");
           this.makeNotice(STATUS_ERROR, NotifyType.NOT_CONNECTED);
           this.connectionLostShown = true;
-        } else {
-          console.log("XNotify: Skipping NOT_CONNECTED", {
-            isConnected: this.xSync.anysocket.isConnected,
-            notifications
-          });
         }
         this.notificationTimeout = null;
       }, 2e3);
-    } else {
-      console.log("XNotify: Reconnection attempt - keeping pending CONNECTION_LOST notification");
     }
     if (this.statusBarIcon)
       this.statusBarIcon.style.color = STATUS_ERROR;
@@ -4850,7 +4816,6 @@ var XNotify = class {
     }
   }
   cleanup() {
-    console.log("XNotify: cleanup() called");
     clearTimeout(this.timeoutStatusMessage);
     this.cancelPendingNotification();
   }
@@ -4874,11 +4839,9 @@ var AnysocketManager = class extends import_Events.default {
     console.log("AnySocket Sync (" + this.plugin.VERSION + ") - Enabled");
     if (app.isMobile) {
       activeWindow.onblur = () => {
-        console.log("AnysocketManager: Mobile onblur - emitting unload");
         this.emit("unload");
       };
       activeWindow.onfocus = () => {
-        console.log("AnysocketManager: Mobile onfocus - emitting focus and reload");
         this.emit("focus");
         this.emit("reload");
       };
@@ -5330,17 +5293,14 @@ var XSync = class {
     this.anysocket.on("reload", this.reload.bind(this));
     this.anysocket.on("unload", this.unload.bind(this));
     this.anysocket.on("disconnected", () => {
-      console.log("XSync: disconnected event fired, calling notifyStatus(CONNECTION_LOST)");
       this.xNotify.notifyStatus(NotifyType.CONNECTION_LOST);
       this.debug && console.log("disconnected");
     });
     this.anysocket.init();
   }
   unload(cleanup = true) {
-    console.log("XSync: unload() called, cleanup =", cleanup);
     clearTimeout(this.reloadTimeout);
     if (cleanup) {
-      console.log("XSync: calling xNotify.cleanup()");
       this.xNotify.cleanup();
     }
     if (this.inited == false)
@@ -5356,7 +5316,6 @@ var XSync = class {
     this.anysocket.removeAllListeners();
   }
   reload() {
-    console.log("XSync: reload() called");
     this.debug && console.log("reloaded");
     this.unload(false);
     this.reloadTimeout = setTimeout(() => {
@@ -5692,8 +5651,8 @@ var DEFAULT_SETTINGS = {
 var AnySocketSyncPlugin = class extends import_obsidian6.Plugin {
   constructor() {
     super(...arguments);
-    this.VERSION = "1.3.4";
-    this.BUILD = "1760102987723";
+    this.VERSION = "1.3.5";
+    this.BUILD = "1760104218422";
     this.isReady = false;
   }
   async onload() {
