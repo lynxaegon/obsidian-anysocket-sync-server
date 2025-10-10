@@ -1,93 +1,296 @@
+/* Ribbon Icon */
 .anysocket-ribbon-icon.offline {
 	color: red;
 }
+
+/* Files History Modal */
 .anysocket-files-history .item-path {
 	font-size: var(--font-ui-medium);
+	font-weight: var(--font-semibold);
 }
 
 .anysocket-files-history .item-metadata {
 	font-size: var(--font-ui-smaller);
-	padding: var(--size-4-1) var(--size-4-2) 0;
+	color: var(--text-muted);
+	padding: var(--size-2-1) 0 0;
 }
 
+/* Version History Modal */
 .anysocket-version-history {
-	padding: 0;
-	width: var(--modal-width);
-	height: var(--modal-height);
-	max-width: var(--modal-max-width);
-	max-height: var(--modal-max-height);
+	padding: 0 !important;
 	overflow: hidden;
 	display: flex;
 	flex-direction: column;
 }
-	.anysocket-version-history .modal-content {
-		display: flex;
+
+.anysocket-version-history .modal-container {
+	padding: 0 !important;
+	margin: 0 !important;
+}
+
+.anysocket-version-history .modal-header {
+	padding: var(--size-4-4) var(--size-4-4) var(--size-4-4) var(--size-4-6);
+	border-bottom: 1px solid var(--background-modifier-border);
+	margin: 0;
+	margin-bottom: 0 !important;
+	background-color: var(--background-secondary);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	min-height: 52px;
+}
+
+.anysocket-version-history .modal-title {
+	font-size: var(--font-ui-large);
+	font-weight: var(--font-semibold);
+	margin: 0 !important;
+	padding: 0 !important;
+	line-height: 1.4;
+	flex: 1;
+}
+
+.anysocket-version-history .modal-close-button {
+	width: 40px;
+	height: 40px;
+	padding: 0 !important;
+	margin: 0 !important;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	border-radius: var(--radius-s);
+	transition: background-color 0.15s ease;
+	cursor: pointer;
+	align-self: center;
+}
+
+.anysocket-version-history .modal-close-button:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.anysocket-version-history .modal-close-button svg {
+	width: 20px;
+	height: 20px;
+}
+
+body.is-mobile .anysocket-version-history .modal-close-button {
+	width: 48px;
+	height: 48px;
+	border-radius: var(--radius-m);
+	top: 0 !important;
+}
+
+body.is-mobile .anysocket-version-history .modal-close-button svg {
+	width: 24px;
+	height: 24px;
+}
+
+/* Override Obsidian's default phone modal close button positioning */
+.is-phone .anysocket-version-history.modal .modal-close-button {
+	top: 0 !important;
+}
+
+
+/* Desktop specific */
+body:not(.is-mobile) .anysocket-version-history {
+	width: 80vw;
+	height: 80vh;
+	max-width: 1200px;
+	max-height: 800px;
+}
+
+/* Mobile specific - Portrait */
+body.is-mobile .anysocket-version-history {
+	width: 100vw;
+	height: 80vh;
+	max-width: 100vw;
+	max-height: 80vh;
+	margin: auto;
+}
+
+/* Mobile Landscape - use desktop-like layout */
+@media (orientation: landscape) {
+	body.is-mobile .anysocket-version-history {
+		width: 95vw;
+		height: 90vh;
 	}
+}
 
-		.anysocket-version-history .modal-content .history-list {
-			padding: var(--size-4-2) var(--size-4-2) 0;
-			display: flex;
-			flex-direction: column;
-			flex-basis: 250px;
-			flex-shrink: 0;
-			border-inline-end: 1px solid var(--background-modifier-border);
-			background-color: var(--background-secondary);
-		}
+.anysocket-version-history .modal-content {
+	display: flex;
+	flex: 1 1 auto;
+	overflow: hidden;
+	min-height: 0;
+}
 
-			.anysocket-version-history .modal-content .version-timestamp {
-				padding: var(--size-4-2) var(--size-2-2) var(--size-4-2) var(--size-4-4);
-				margin-bottom: var(--size-2-1);
-				border-radius: var(--radius-s);
-				font-size: var(--font-ui-medium);
-				line-height: var(--line-height-tight);
-				color: var(--nav-item-color);
-				font-variant: tabular-nums;
-			}
+/* History List (Left Sidebar) */
+.anysocket-version-history .history-list {
+	padding: var(--size-4-4) var(--size-4-6);
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-1);
+	overflow-y: auto;
+	overflow-x: hidden;
+	background-color: var(--background-secondary);
+}
 
-			.anysocket-version-history .modal-content .version-timestamp:hover {
-				background-color: var(--nav-item-background-active);
-				color: var(--nav-item-color-active);
-			}
+body:not(.is-mobile) .anysocket-version-history .history-list {
+	flex-basis: 280px;
+	flex-shrink: 0;
+	border-inline-end: 1px solid var(--background-modifier-border);
+}
 
-			.anysocket-version-history .modal-content .version-timestamp.active {
-				background-color: var(--nav-item-background-active);
-				color: var(--nav-item-color-active);
-			}
+/* Mobile Portrait - full width and full height */
+body.is-mobile .anysocket-version-history .history-list {
+	flex: 1 1 auto;
+	min-height: 0;
+	padding: 0;
+	background-color: transparent;
+}
 
-		.anysocket-version-history .modal-content .version-container {
-			background-color: var(--background-primary);
-			padding: 0;
-			height: auto;
-			display: flex;
-			flex-direction: column;
-			width: "100%";
-			flex: 1 1 auto;
-		}
+/* Mobile Landscape - side panel like desktop */
+@media (orientation: landscape) {
+	body.is-mobile .anysocket-version-history .history-list {
+		flex-basis: 240px;
+		flex-shrink: 0;
+		flex: 0 0 240px;
+		border-inline-end: 1px solid var(--background-modifier-border);
+	}
+}
 
-			.anysocket-version-history .modal-content .version-content {
-				display: flex;
-				flex-direction: column;
-				flex-grow: 1;
-				overflow: hidden;
-				padding: 0;
-			}
+.anysocket-version-history .version-timestamp {
+	padding: var(--size-4-3) var(--size-4-4);
+	border-radius: var(--radius-m);
+	font-size: var(--font-ui-medium);
+	line-height: var(--line-height-normal);
+	color: var(--text-normal);
+	font-variant-numeric: tabular-nums;
+	cursor: pointer;
+	transition: all 0.15s ease;
+	user-select: none;
+	white-space: nowrap;
+}
 
-			.anysocket-version-history .modal-content .version-titlebar {
-				display: flex;
-				align-items: center;
-				padding: var(--size-4-2) var(--size-4-4);
-				border-bottom: 1px solid var(--background-modifier-border);
-			}
+/* Mobile - match header padding */
+body.is-mobile .anysocket-version-history .version-timestamp {
+	padding: var(--size-4-3) var(--size-4-6);
+	margin: 0;
+}
 
-			.anysocket-version-history .modal-content .version-filename {
-				font-size: var(--font-ui-medium);
-				font-weight: var(--file-header-font-weight);
-				flex-grow: 1;
-			}
+body.is-mobile .anysocket-version-history .version-timestamp:first-child {
+	margin-top: var(--size-4-4);
+}
 
-			.anysocket-version-history .modal-content .version-actions {
-				display: flex;
-				align-items: center;
-				gap: var(--size-4-1);
-				padding-inline-end: var(--size-4-8);
-			}
+body.is-mobile .anysocket-version-history .modal-content {
+	background-color: var(--background-secondary);
+}
+
+.anysocket-version-history .version-timestamp:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.anysocket-version-history .version-timestamp.active {
+	background-color: var(--background-modifier-active-hover);
+	color: var(--text-accent);
+	font-weight: var(--font-semibold);
+}
+
+/* Version Container (Right Side) */
+.anysocket-version-history .version-container {
+	background-color: var(--background-secondary);
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	overflow: hidden;
+	min-width: 0;
+}
+
+/* Mobile Portrait - overlay */
+body.is-mobile .anysocket-version-history .version-container {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 10;
+}
+
+/* Mobile Landscape - side by side */
+@media (orientation: landscape) {
+	body.is-mobile .anysocket-version-history .version-container {
+		position: relative;
+		z-index: auto;
+	}
+}
+
+.anysocket-version-history .version-content {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	overflow: hidden;
+	padding: 0;
+	margin: 0;
+}
+
+/* Titlebar */
+.anysocket-version-history .version-titlebar {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-3);
+	padding: var(--size-4-4) var(--size-4-6);
+	border-bottom: 1px solid var(--background-modifier-border);
+	background-color: var(--background-secondary);
+	flex-shrink: 0;
+	min-height: 52px;
+	margin: 0;
+}
+
+.anysocket-version-history .version-titlebar button {
+	flex-shrink: 0;
+}
+
+.anysocket-version-history .version-filename {
+	font-size: var(--font-ui-large);
+	font-weight: var(--font-semibold);
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text-normal);
+}
+
+.anysocket-version-history .version-actions {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-3);
+	flex-shrink: 0;
+}
+
+.anysocket-version-history .version-actions button {
+	padding: var(--size-4-2) var(--size-4-4);
+	font-size: var(--font-ui-medium);
+}
+
+/* Markdown Preview */
+.anysocket-version-history .markdown-preview-view {
+	padding: var(--size-4-8) var(--size-4-12);
+	overflow-y: auto;
+	overflow-x: hidden;
+	flex: 1;
+	background-color: var(--background-secondary);
+	margin: 0;
+}
+
+body.is-mobile .anysocket-version-history .markdown-preview-view {
+	padding: var(--size-4-6) var(--size-4-6);
+}
+
+@media (orientation: landscape) {
+	body.is-mobile .anysocket-version-history .markdown-preview-view {
+		padding: var(--size-4-6) var(--size-4-8);
+	}
+}
+
