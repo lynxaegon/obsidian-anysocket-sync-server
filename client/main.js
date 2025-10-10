@@ -5183,13 +5183,11 @@ var XSync = class {
     if (!this.anysocket.isConnected)
       return;
     if (this.isProcessingDeleteQueue) {
-      this.debug && console.log("Delete queue already being processed, will retry after");
       return;
     }
     const queuedPaths = Object.keys(this.deleteQueue);
     if (queuedPaths.length === 0)
       return;
-    this.debug && console.log("Processing delete queue:", queuedPaths.length, "deletions");
     this.isProcessingDeleteQueue = true;
     const itemsToProcess = { ...this.deleteQueue };
     const processedPaths = [];
@@ -5197,20 +5195,16 @@ var XSync = class {
       for (let path of queuedPaths) {
         const deleteEvent = itemsToProcess[path];
         try {
-          this.debug && console.log("Publishing deletion:", path);
           this.anysocket.peer.send({
             type: "file_event",
             data: {
               ...deleteEvent.metadata,
               path
             }
-          }).catch((e) => {
-            console.error("Failed to send deletion event:", path, e);
           });
-          this.debug && console.log("Deletion published successfully:", path);
           processedPaths.push(path);
         } catch (e) {
-          console.error("Failed to publish deletion:", path, e);
+          console.error("Failed to send deletion event:", path, e);
         }
       }
       for (let path of processedPaths) {
@@ -5218,11 +5212,9 @@ var XSync = class {
       }
       await this.storage.saveDeleteQueue(this.deleteQueue);
       const remaining = Object.keys(this.deleteQueue).length;
-      this.debug && console.log(`Delete queue processed: ${processedPaths.length} sent, ${remaining} remaining`);
     } finally {
       this.isProcessingDeleteQueue = false;
       if (Object.keys(this.deleteQueue).length > 0) {
-        this.debug && console.log("Items added during processing, triggering another cycle");
         this.processDeleteQueue().catch((e) => {
           console.error("Error in follow-up delete queue processing:", e);
         });
@@ -5281,11 +5273,9 @@ var XSync = class {
       return;
     }
     if (action == "rename") {
-      this.debug && console.log("Rename event:", args[0], "->", file.path);
       const oldPath = args[0];
       const oldMetadata = await this.storage.readMetadata(oldPath);
       if (oldMetadata) {
-        this.debug && console.log("Adding delete to queue with preserved SHA1:", oldPath);
         this.deleteQueue[oldPath] = {
           action: "delete",
           path: oldPath,
@@ -5298,7 +5288,6 @@ var XSync = class {
           timestamp: Date.now()
         };
       } else {
-        this.debug && console.log("No metadata found for old path, using null SHA1:", oldPath);
         this.deleteQueue[oldPath] = {
           action: "delete",
           path: oldPath,
@@ -5317,14 +5306,11 @@ var XSync = class {
           console.error("Error processing delete queue:", e);
         });
       }
-      this.debug && console.log("Processing create after rename:", file.path);
       await this.processLocalEvent("create", file, null, fromUnsent, true);
-      this.debug && console.log("Rename processing complete");
       return;
     }
     let metadata = await this.getMetadata(action, file);
     if (action == "delete") {
-      this.debug && console.log("Delete event - adding to queue:", file.path);
       this.deleteQueue[file.path] = {
         action,
         path: file.path,
@@ -5351,15 +5337,12 @@ var XSync = class {
     }
   }
   async _processLocalEvent(action, file, metadata, forceChanged = false) {
-    this.debug && console.log("anysocket sync event", action, file.path, "forceChanged:", forceChanged);
     try {
       let result = metadata || await this.getMetadata(action, file);
       if (!forceChanged && !result.changed) {
-        this.debug && console.log("Skipping - no change detected for:", file.path);
         return;
       }
       if (!this.anysocket.isConnected) {
-        this.debug && console.log("Skipping - not connected");
         return;
       }
       this.debug && console.log("Sending file event:", action, file.path);
@@ -5370,7 +5353,6 @@ var XSync = class {
       }).catch((e) => {
         console.error("Failed to send file event:", file.path, e);
       });
-      this.debug && console.log("File event sent successfully");
     } catch (e) {
       console.error("Error in _processLocalEvent:", e);
     }
@@ -5800,8 +5782,8 @@ var DEFAULT_SETTINGS = {
 var AnySocketSyncPlugin = class extends import_obsidian6.Plugin {
   constructor() {
     super(...arguments);
-    this.VERSION = "1.3.5";
-    this.BUILD = "1760115797198";
+    this.VERSION = "1.4.0";
+    this.BUILD = "1760117241407";
     this.isReady = false;
   }
   async onload() {

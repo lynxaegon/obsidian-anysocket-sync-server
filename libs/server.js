@@ -11,6 +11,10 @@ module.exports = class Server {
             this.debug = config.logs.level;
         }
 
+        // Expose peerList for testing
+        this.getPeerList = () => peerList;
+        this.setPeerList = (list) => { peerList = list; };
+
         this.server = new AnySocket();
         this.server.onAuth = (packet) => {
             return packet.auth == Helpers.getSHA(packet.id.substring(0, 16) + this.config.password + packet.id.substring(16));
