@@ -216,7 +216,7 @@ module.exports = class Server {
         peer.data.syncing = false;
         peer.send({
             type: "sync_complete"
-        });
+        }).catch(e => console.error("ERROR:", e));
     }
 
     async onFileEvent(data, packet) {
@@ -233,7 +233,7 @@ module.exports = class Server {
                     type: "send",
                     path: data.path
                 }
-            });
+            }).catch(e => console.error("ERROR:", e));;
             return "client_newer";
         }
         // send to client
@@ -250,7 +250,7 @@ module.exports = class Server {
                         AnySocket.Packer.pack(await XStorage.read(data.path, true)) :
                         await XStorage.read(data.path)
                 }
-            });
+            }).catch(e => console.error("ERROR:", e));;
             this.debug >= 2 && console.log("[SERVER][" + packet.peer.data.id + "] Updating client:", data.path);
             return "server_newer";
         }
@@ -274,7 +274,7 @@ module.exports = class Server {
                     path: data.path,
                     metadata: await XStorage.readMetadata(data.path)
                 }
-            });
+            }).catch(e => console.error("ERROR:", e));;
         } else if (data.type == "apply") {
             switch (data.metadata.action) {
                 case "created":
@@ -300,7 +300,7 @@ module.exports = class Server {
                             other.send({
                                 type: "file_data",
                                 data: data
-                            });
+                            }).catch(e => console.error("ERROR:", e));;
                         }
                     }
                 } catch (e) {
