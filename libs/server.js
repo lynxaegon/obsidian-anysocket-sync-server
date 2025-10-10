@@ -227,6 +227,25 @@ module.exports = class Server {
 
         // request from client
         if (fileResult == -1) {
+            if (data.action === "deleted") {
+                await XStorage.writeMetadata(data.path, data);
+                
+                for(let other of peerList) {
+                    if (other.id != packet.peer.id && other.data && other.data.autoSync) {
+                        other.send({
+                            type: "file_data",
+                            data: {
+                                type: "apply",
+                                path: data.path,
+                                metadata: data
+                            }
+                        }).catch(e => console.error("ERROR:", e));
+                    }
+                }
+                return "client_newer";
+            }
+            
+            // For created/modified files, request the content
             packet.peer.send({
                 type: "file_data",
                 data: {
