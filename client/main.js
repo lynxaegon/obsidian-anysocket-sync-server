@@ -5195,6 +5195,14 @@ var XSync = class {
       for (let path of queuedPaths) {
         const deleteEvent = itemsToProcess[path];
         try {
+          const file = app.vault.getAbstractFileByPath(path);
+          if (file) {
+            const currentMetadata = await this.storage.readMetadata(path);
+            if (currentMetadata && currentMetadata.mtime > deleteEvent.metadata.mtime) {
+              processedPaths.push(path);
+              continue;
+            }
+          }
           this.anysocket.peer.send({
             type: "file_event",
             data: {
@@ -5271,6 +5279,10 @@ var XSync = class {
         args
       };
       return;
+    }
+    if ((action == "create" || action == "modify") && this.deleteQueue[file.path]) {
+      delete this.deleteQueue[file.path];
+      await this.storage.saveDeleteQueue(this.deleteQueue);
     }
     if (action == "rename") {
       const oldPath = args[0];
@@ -5782,8 +5794,8 @@ var DEFAULT_SETTINGS = {
 var AnySocketSyncPlugin = class extends import_obsidian6.Plugin {
   constructor() {
     super(...arguments);
-    this.VERSION = "1.4.0";
-    this.BUILD = "1760117241407";
+    this.VERSION = "1.4.1";
+    this.BUILD = "1760117620856";
     this.isReady = false;
   }
   async onload() {

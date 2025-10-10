@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-anysocket-sync-server",
-	"version": "1.4.0",
+	"version": "1.4.1",
 	"description": "Self-Hosted synchronization server for Obsidian AnySocket Sync",
 	"main": "index.js",
 	"scripts": {

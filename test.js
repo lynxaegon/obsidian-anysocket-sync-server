@@ -1165,6 +1165,73 @@ async function runTests() {
         server.setPeerList([]);
     });
 
+    // Test 24: Client Bug - Delete then recreate same file (create should win)
+    await helper.test('Client Bug Fix - Delete then recreate same file path', async () => {
+        const peer = new MockPeer('client1', 'test-device-1');
+        const now = Date.now();
+        
+        // Create initial file
+        await server.onFileData({
+            type: 'apply',
+            binary: false,
+            data: 'First version',
+            path: 'recreate-test.md',
+            metadata: {
+                action: 'created',
+                sha1: 'firstHash',
+                mtime: now,
+                type: 'file'
+            }
+        }, { peer });
+
+        // User deletes the file
+        await server.onFileEvent({
+            action: 'deleted',
+            sha1: 'firstHash',
+            mtime: now + 1000,
+            type: 'file',
+            path: 'recreate-test.md'
+        }, { peer });
+
+        let metadata = await XStorage.readMetadata('recreate-test.md');
+        helper.assertEquals(metadata.action, 'deleted', 'File should be deleted');
+
+        peer.clearMessages();
+
+        // User creates a NEW file with the SAME path (newer timestamp)
+        await server.onFileEvent({
+            action: 'created',
+            sha1: 'secondHash',
+            mtime: now + 2000,  // Newer than deletion
+            type: 'file',
+            path: 'recreate-test.md'
+        }, { peer });
+
+        helper.assertEquals(peer.getLastMessage('file_data').data.type, 'send', 'Server should request new file');
+
+        // Send the new file content
+        await server.onFileData({
+            type: 'apply',
+            binary: false,
+            data: 'Second version - completely new file',
+            path: 'recreate-test.md',
+            metadata: {
+                action: 'created',
+                sha1: 'secondHash',
+                mtime: now + 2000,
+                type: 'file'
+            }
+        }, { peer });
+
+        // Verify the new file exists (not deleted)
+        metadata = await XStorage.readMetadata('recreate-test.md');
+        helper.assertEquals(metadata.action, 'created', 'File should be created (not deleted)');
+        helper.assertEquals(metadata.sha1, 'secondHash', 'Should have new file SHA1');
+
+        const content = await XStorage.read('recreate-test.md');
+        helper.assertEquals(content, 'Second version - completely new file', 'Should have new content');
+    });
+
     // Clean up
     try {
         await fs.rm(TEST_DATA_DIR, { recursive: true, force: true });
