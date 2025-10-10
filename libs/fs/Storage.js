@@ -21,7 +21,13 @@ module.exports = class Storage {
             (await this.fsVault.iterateVersions(path)).map(async item => await this.fsVault.delete(item.path));
         }
 
-        return await this.fsVault.write(path + "/" + metadata.mtime, data, binary);
+        try {
+            return await this.fsVault.write(path + "/" + metadata.mtime, data, binary);
+        } catch (e) {
+            console.error("[Error] Storage.write (" + path + "/" + metadata.mtime + ")", e);
+        }
+
+        return null;
     }
 
     async read(path, binary = false) {
@@ -30,7 +36,12 @@ module.exports = class Storage {
             return null;
         }
 
-        return await this.fsVault.read(path + "/" + metadata.mtime, binary);
+        try {
+            return await this.fsVault.read(path + "/" + metadata.mtime, binary);
+        } catch (e) {
+            console.error("[Error] Storage.read (" + path + "/" + metadata.mtime + ")", e);
+        }
+        return null;
     }
 
     async readExact(path, binary) {
@@ -50,14 +61,18 @@ module.exports = class Storage {
             try {
                 return JSON.parse(await this.fsVault.read(path + "/metadata"));
             } catch (e) {
-                console.log("[Error] Storage.readMetadata (" + path + "/metadata)", e);
+                console.error("[Error] Storage.readMetadata (" + path + "/metadata)", e);
             }
         }
         return null;
     }
 
     async writeMetadata(path, metadata) {
-        return await this.fsVault.write(path + "/metadata", JSON.stringify(metadata));
+        try {
+            return await this.fsVault.write(path + "/metadata", JSON.stringify(metadata));
+        } catch (e) {
+            console.error("[Error] Storage.writeMetadata (" + path + "/metadata)", e);
+        }
     }
 
     async iterate() {
