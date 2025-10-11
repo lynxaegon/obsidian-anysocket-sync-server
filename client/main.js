@@ -5236,7 +5236,7 @@ var XSync = class {
       return;
     for (let key in this.unsentSessionEvents) {
       let event = this.unsentSessionEvents[key];
-      await this.processLocalEvent(event.action, event.file, event.args, true);
+      await this._processLocalEvent(event.action, event.file, event.metadata, false);
     }
     this.unsentSessionEvents = {};
     this.isSyncing = true;
@@ -5271,15 +5271,7 @@ var XSync = class {
   async onFocusChanged() {
     this.xTimeouts.executeAll();
   }
-  async processLocalEvent(action, file, args, fromUnsent = false, forceChanged = false) {
-    if (!this.plugin.settings.autoSync && !fromUnsent && this.anysocket.isConnected) {
-      this.unsentSessionEvents[file.path] = {
-        action,
-        file,
-        args
-      };
-      return;
-    }
+  async processLocalEvent(action, file, args, forceChanged = false) {
     if ((action == "create" || action == "modify") && this.deleteQueue[file.path]) {
       delete this.deleteQueue[file.path];
       await this.storage.saveDeleteQueue(this.deleteQueue);
@@ -5318,7 +5310,7 @@ var XSync = class {
           console.error("Error processing delete queue:", e);
         });
       }
-      await this.processLocalEvent("create", file, null, fromUnsent, true);
+      await this.processLocalEvent("create", file, null, true);
       return;
     }
     let metadata = await this.getMetadata(action, file);
@@ -5337,7 +5329,12 @@ var XSync = class {
       }
       return;
     }
-    if (!this.anysocket.isConnected) {
+    if (!this.plugin.settings.autoSync || !this.anysocket.isConnected) {
+      this.unsentSessionEvents[file.path] = {
+        action,
+        file,
+        metadata
+      };
       return;
     }
     if (action == "modify" && this.plugin.settings.delayedSync > 0) {
@@ -5466,14 +5463,16 @@ var XSync = class {
     }
     if (data.type == "send") {
       let isBinary = Utils_default.isBinary(data.path);
+      const fileData = isBinary ? await this.storage.readBinary(data.path) : await this.storage.read(data.path);
+      const metadata = await this.storage.readMetadata(data.path);
       this.anysocket.send({
         type: "file_data",
         data: {
           type: "apply",
           binary: isBinary,
-          data: isBinary ? import_AnySocket.default.Packer.pack(await this.storage.readBinary(data.path)) : await this.storage.read(data.path),
+          data: isBinary ? import_AnySocket.default.Packer.pack(fileData) : fileData,
           path: data.path,
-          metadata: await this.storage.readMetadata(data.path)
+          metadata
         }
       });
     } else if (data.type == "apply") {
@@ -5794,8 +5793,8 @@ var DEFAULT_SETTINGS = {
 var AnySocketSyncPlugin = class extends import_obsidian6.Plugin {
   constructor() {
     super(...arguments);
-    this.VERSION = "1.4.1";
-    this.BUILD = "1760117620856";
+    this.VERSION = "1.4.2";
+    this.BUILD = "1760172808250";
     this.isReady = false;
   }
   async onload() {
