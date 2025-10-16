@@ -248,7 +248,13 @@ module.exports = class Server {
                 }
                 return "client_newer";
             }
-            
+
+            // For created/modified folders, just update the metadata
+            if(data.type === "folder") {
+                await XStorage.writeMetadata(data.path, data);
+                return "client_newer";
+            }
+
             // For created/modified files, request the content
             packet.peer.send({
                 type: "file_data",
@@ -259,6 +265,7 @@ module.exports = class Server {
             }).catch(e => console.error("ERROR:", e));;
             return "client_newer";
         }
+
         // send to client
         else if (fileResult == 1) {
             let isBinary = Helpers.isBinary(data.path);
