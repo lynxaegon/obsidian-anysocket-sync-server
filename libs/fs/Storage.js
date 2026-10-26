@@ -159,6 +159,17 @@ module.exports = class Storage {
         return stored;
     }
 
+    // an older version for the history only (the entry's current version stays as it is)
+    async addVersion(path, mtime, data, binary) {
+        const versionPath = path + "/" + mtime;
+        if (!await this.fsVault.exists(versionPath)) {
+            await this.fsVault.write(versionPath, data, binary);
+        }
+        if (binary) {
+            await this.pruneVersions(path, this.binaryVersions);
+        }
+    }
+
     // keeps the newest `keep` versions of an entry
     async pruneVersions(path, keep) {
         const versions = await this.fsVault.iterateVersions(path);

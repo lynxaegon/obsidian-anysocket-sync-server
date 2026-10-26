@@ -101,13 +101,42 @@ test("a second conflict on the same day gets its own name", async (t) => {
     assert.match(two.copy, / 2\)\.md$/);
 });
 
-test("a device that never synced a file it also has keeps both when they differ", async (t) => {
-    const { sync } = await setup(t);
+test("a device that never synced a file: the newer version wins, the older one goes into the history", async (t) => {
+    const { sync, storage } = await setup(t);
     await sync.put("a.md", file(1000), null, "server copy\n", LAPTOP);
-    const r = await sync.put("a.md", file(2000), null, "local copy\n", PHONE);
-    assert.equal(r.result, RESULT.KEPT_BOTH);
-    assert.equal(await text(sync, "a.md"), "local copy\n");
-    assert.equal(await text(sync, r.copy), "server copy\n");
+    const r = await sync.put("a.md", file(2000), null, "newer local copy\n", PHONE);
+    assert.equal(r.result, RESULT.APPLIED);
+    assert.equal(await text(sync, "a.md"), "newer local copy\n");
+    assert.deepEqual((await sync.versions("a.md")).data, [2000, 1000], "the older one is in the history");
+    assert.deepEqual([...storage.index.keys()], ["a.md"], "no second file");
+});
+
+test("a device that never synced a file and has an older version gets the newer one; its own goes into the history", async (t) => {
+    const { sync, storage, changes } = await setup(t);
+    await sync.put("a.md", file(5000), null, "newer on the server\n", LAPTOP);
+    changes.length = 0;
+    const r = await sync.put("a.md", file(2000), null, "stale on the phone\n", PHONE);
+    assert.equal(r.result, RESULT.OUTDATED);
+    assert.equal(r.meta.mtime, 5000);
+    assert.equal(await text(sync, "a.md"), "newer on the server\n");
+    assert.deepEqual((await sync.versions("a.md")).data, [5000, 2000]);
+    assert.equal((await sync.content("a.md", 2000)).toString(), "stale on the phone\n");
+    assert.deepEqual([...storage.index.keys()], ["a.md"], "no second file");
+    assert.equal(changes.length, 0, "nothing changed for the other devices");
+});
+
+test("content written by 1.5 with a missing or wrong hash is compared by its bytes (no false conflict)", async (t) => {
+    const { sync, storage } = await setup(t);
+    // 1.5 left sha1 null after a restore
+    await storage.storeEntry("empty.md", { type: "file", action: "created", mtime: 1000, sha1: null, path: "empty.md" }, Buffer.alloc(0));
+    await storage.storeEntry("note.md", { type: "file", action: "created", mtime: 1000, sha1: "stale-hash", path: "note.md" }, Buffer.from("same"));
+    const empty = await sync.put("empty.md", file(900), null, Buffer.alloc(0), PHONE);
+    assert.equal(empty.result, RESULT.UNCHANGED);
+    assert.equal(empty.meta.sha1, sha256(Buffer.alloc(0)), "the hash is repaired");
+    const note = await sync.put("note.md", file(2000), { sha1: "something-else", action: "created" }, "same", PHONE);
+    assert.equal(note.result, RESULT.UNCHANGED);
+    assert.equal((await sync.meta("note.md")).sha1, sha256("same"));
+    assert.deepEqual([...storage.index.keys()].sort(), ["empty.md", "note.md"]);
 });
 
 test("binary files that both changed keep both", async (t) => {

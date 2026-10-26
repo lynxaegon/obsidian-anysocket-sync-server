@@ -4408,6 +4408,8 @@ var Activity = class extends import_Events3.default {
     switch (item.type) {
       case "downloaded":
         return { icon: "arrow-down", text: "Got " + name };
+      case "updated":
+        return { icon: "arrow-down", text: "Got the newer " + name + " (yours is in its history)" };
       case "uploaded":
         return { icon: "arrow-up", text: "Sent " + name };
       case "deleted":
@@ -5159,6 +5161,12 @@ var SyncV2 = class {
         }
         this.activity.add("kept_both", path, result.copy);
         this.xSync.onKeptBoth(path, result.copy);
+        break;
+      case "outdated":
+        current.synced = null;
+        this.index.set(path, current);
+        await this.download(path, result.meta);
+        this.activity.add("updated", path);
         break;
       case "stale":
         current.synced = null;
@@ -6717,7 +6725,7 @@ var AnySocketSyncPlugin = class extends import_obsidian10.Plugin {
   constructor() {
     super(...arguments);
     this.VERSION = "1.6.0";
-    this.BUILD = "1793028164442";
+    this.BUILD = "1793028996616";
     this.isReady = false;
     this.panel = null;
   }

@@ -202,3 +202,46 @@ test("a delete the 1.5 plugin had queued but not sent is not undone by the upgra
     assert.equal(await laptop.exists("old note.md"), false, "not brought back");
     assert.equal(server.stored("old note.md").meta.action, "deleted");
 });
+
+test("upgrading with a device that fell behind under 1.5: no copies, the newer versions win (as in 1.5)", async (t) => {
+    const old = await new ProductionServer(t).start();
+    const laptop = await oldDevice(t, old, "Laptop");
+    const phone = await oldDevice(t, old, "Phone");
+    await sleep(1500);
+    await laptop.write("Notes/state.md", "v1 from before");
+    await laptop.write("Notes/empty.md", "");
+    await laptop.write("Notes/same.md", "unchanged everywhere");
+    await storedEventually(old, "Notes/same.md", "unchanged everywhere");
+    await waitFor(async () => (await phone.read("Notes/same.md")) === "unchanged everywhere", { message: "phone in sync", timeout: 30000 });
+    await sleep(1000);
+
+    // the phone is away while the laptop keeps writing; 1.5 leaves a file without a hash
+    await phone.quit();
+    await laptop.write("Notes/state.md", "v2, much newer");
+    await storedEventually(old, "Notes/state.md", "v2, much newer");
+    await laptop.quit();
+    await old.stop();
+    const emptyMeta = path.join(old.dataDir, "files", "Notes", "empty.md", "metadata");
+    const meta = JSON.parse(fs.readFileSync(emptyMeta, "utf8"));
+    meta.sha1 = null;
+    fs.writeFileSync(emptyMeta, JSON.stringify(meta));
+
+    const server = await new Server(t, { dataDir: old.dataDir }).start();
+    for (const device of [laptop, phone]) {
+        device.server = server;
+        device.settings.port = String(server.port);
+        await device.start();
+        await waitFor(async () => (await device.state()).plugins.enabled === 1, { message: device.name + " updated" });
+        await reloadPushedPlugin(device);
+        await device.waitSynced();
+    }
+
+    const tree = await waitSame([laptop, phone]);
+    assert.deepEqual(Object.keys(tree).filter(p => p.includes("'s version")), [], "no copies");
+    assert.equal(await phone.read("Notes/state.md"), "v2, much newer");
+    for (const device of [laptop, phone]) {
+        const notices = (await device.notices()).join("\n");
+        assert.doesNotMatch(notices, /changed on two devices/, device.name + " shows no false alarm");
+    }
+    assert.equal(server.stored("Notes/empty.md").meta.sha1, crypto.createHash("sha256").update("").digest("hex"), "the missing hash is repaired");
+});

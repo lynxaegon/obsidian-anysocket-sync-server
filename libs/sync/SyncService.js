@@ -15,6 +15,9 @@ const RESULT = {
     KEPT_BOTH: "kept_both",
     // a delete of a version that was since changed elsewhere; the newer version is kept
     STALE: "stale",
+    // the device's version was older (and it never synced this file): the server's stays,
+    // the device's went into the history
+    OUTDATED: "outdated",
     // a rename the server could not do as a move; the client deletes + creates instead
     FALLBACK: "fallback",
     RENAMED: "renamed"
@@ -157,6 +160,19 @@ module.exports = class SyncService {
 
             // ---- the server changed since this device last saw it ----
 
+            // what the server says about its content can be wrong (1.5.x left sha1 null after a
+            // restore, or stale): the content decides. The same bytes are no change at all.
+            if (meta.type === "file" && meta.action === "created" && current.type === "file" && current.action === "created") {
+                const serverData = await this.storage.read(path, true);
+                if (serverData && sha256(serverData) === meta.sha1) {
+                    let repaired = current;
+                    if (current.sha1 !== meta.sha1) {
+                        repaired = await this.storage.writeMetadata(path, Object.assign({}, current, { sha1: meta.sha1 }));
+                    }
+                    return { result: RESULT.UNCHANGED, meta: repaired };
+                }
+            }
+
             // deleting a version that is no longer the current one: keep the newer one
             if (meta.action === "deleted") {
                 return { result: RESULT.STALE, meta: current };
@@ -190,6 +206,19 @@ module.exports = class SyncService {
                         return { result: RESULT.MERGED, meta: stored };
                     }
                 }
+            }
+
+            // this device never synced this file (its first sync with 1.6.0, or a copied vault):
+            // with no common starting point it is not two edits of the same version, so the newer
+            // version wins (as it always did) and the other one goes into the history
+            if (!base && meta.type === "file" && current.type === "file" && current.action === "created") {
+                if (meta.mtime > current.mtime) {
+                    const stored = await this.store(path, meta, data);
+                    changes.push(path);
+                    return { result: RESULT.APPLIED, meta: stored };
+                }
+                await this.storage.addVersion(path, meta.mtime, data, Helpers.isBinary(path));
+                return { result: RESULT.OUTDATED, meta: current };
             }
 
             // keep both: the newer version keeps the name, the other one gets a second file
