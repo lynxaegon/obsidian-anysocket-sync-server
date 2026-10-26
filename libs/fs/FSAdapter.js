@@ -60,6 +60,14 @@ module.exports = class FSAdapter {
         }
     }
 
+    async size(path) {
+        try {
+            return (await fs.stat(this.basePath + path)).size;
+        } catch (e) {
+            return null;
+        }
+    }
+
     async exists(path) {
         return fs.access(this.basePath + path, fsConstants.F_OK)
             .then(() => true)

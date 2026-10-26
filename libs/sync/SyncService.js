@@ -72,15 +72,23 @@ module.exports = class SyncService {
         this.onChange = options.onChange || (() => {});
     }
 
-    list(cursor, epoch) {
+    /**
+     * What changed after `cursor`, oldest first, at most `limit` entries at a time (a vault can
+     * have hundreds of thousands of files). A cursor from another epoch (the server restarted)
+     * or none at all starts a full listing. `more`: call again with the returned cursor.
+     */
+    list(cursor, epoch, limit = Infinity) {
         const full = epoch !== this.storage.epoch || typeof cursor !== "number";
-        const seq = this.storage.seq;
-        const entries = full ? Array.from(this.storage.index.entries()) : this.storage.changesSince(cursor);
+        const latest = this.storage.seq;
+        const changes = this.storage.changesSince(full ? 0 : cursor);
+        const page = changes.slice(0, Math.max(1, limit));
+        const more = changes.length > page.length;
         return {
             epoch: this.storage.epoch,
-            cursor: seq,
+            cursor: more ? page[page.length - 1][1].seq : latest,
             full,
-            entries
+            more,
+            entries: page
         };
     }
 
@@ -105,6 +113,9 @@ module.exports = class SyncService {
     }
 
     async store(path, meta, data) {
+        if (data != null) {
+            meta.size = data.length;
+        }
         return await this.storage.storeEntry(path, meta, data, Helpers.isBinary(path));
     }
 

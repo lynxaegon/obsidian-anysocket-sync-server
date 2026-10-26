@@ -15,6 +15,10 @@ const PLUGIN_DIR = ".obsidian/plugins/anysocket-sync";
 let plugin = null;
 let PluginClass = null;
 
+// peak memory, sampled (to check that big syncs stay bounded)
+let peakRss = 0;
+setInterval(() => { peakRss = Math.max(peakRss, process.memoryUsage().rss); }, 25).unref();
+
 process.on("unhandledRejection", (e) => {
     console.error("[device " + DEVICE_NAME + "] unhandled rejection", e);
 });
@@ -72,6 +76,9 @@ function state() {
         statusBar: app.statusBar ? app.statusBar._children.map(c => c._text).join("") : "",
         activity: x.activity.items.map(i => i.type + ":" + i.path),
         version: plugin.VERSION,
+        skipped: x.v2 ? [...x.v2.skipped.keys()] : [],
+        transfers: x.transferStats ? Object.assign({}, x.transferStats) : null,
+        peakRss,
         plugins: { disabled: app.plugins.disabled, enabled: app.plugins.enabled }
     };
 }
@@ -124,6 +131,10 @@ const commands = {
     },
     async state() {
         return state();
+    },
+    async resetPeak() {
+        peakRss = process.memoryUsage().rss;
+        return peakRss;
     },
     async notices() {
         return noticeTexts();

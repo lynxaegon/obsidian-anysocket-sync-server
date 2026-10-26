@@ -37,6 +37,25 @@ module.exports = class Storage {
                 this.seq = metadata.seq;
             }
         }
+        // entries written by 1.5.x have no sequence number; numbered in memory so a listing can be
+        // paged (a restart changes the epoch, so clients list everything again anyway)
+        for (const metadata of this.index.values()) {
+            if (!metadata.seq) {
+                metadata.seq = ++this.seq;
+            }
+        }
+    }
+
+    // sizes of entries written before 1.6.0, filled in after start without blocking it
+    async fillSizes() {
+        for (const [path, metadata] of this.index) {
+            if (metadata.type === "file" && metadata.action === "created" && metadata.size == null) {
+                const size = await this.fsVault.size(path + "/" + metadata.mtime);
+                if (size != null && this.index.get(path) === metadata) {
+                    metadata.size = size;
+                }
+            }
+        }
     }
 
     // reads an entry's metadata from disk, rebuilding it from its newest version if it is corrupt
@@ -224,7 +243,7 @@ module.exports = class Storage {
         return Array.from(this.index.keys());
     }
 
-    // [path, metadata] pairs changed after `seq`
+    // [path, metadata] pairs changed after `seq`, oldest change first
     changesSince(seq) {
         const result = [];
         for (const [path, metadata] of this.index) {

@@ -59,4 +59,5 @@ const SyncCleanup = require("./libs/SyncCleanup");
         process.exit(1);
     }
     await new SyncCleanup(config, server.devices).start();
+    XStorage.fillSizes().catch(e => console.error("[SERVER] Could not read file sizes:", e));
 })();

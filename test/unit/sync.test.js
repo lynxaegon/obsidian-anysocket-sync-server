@@ -273,3 +273,53 @@ test("files and versions for the history views", async (t) => {
     assert.equal((await sync.content("a.md", 1000)).toString(), "a");
     assert.equal(await sync.content("a.md", "../../x"), null);
 });
+
+test("list: big vaults come in pages, and the pages add up to everything", async (t) => {
+    const { sync } = await setup(t);
+    for (let i = 0; i < 25; i++) {
+        await sync.put("n" + i + ".md", file(1000), null, "note " + i, LAPTOP);
+    }
+    const seen = new Set();
+    let page = sync.list(null, null, 10);
+    assert.equal(page.full, true);
+    assert.equal(page.entries.length, 10);
+    assert.equal(page.more, true);
+    page.entries.forEach(e => seen.add(e[0]));
+    // a change while paging still shows up
+    await sync.put("n0.md", file(2000), baseOf(await sync.meta("n0.md")), "changed", LAPTOP);
+    while (page.more) {
+        page = sync.list(page.cursor, page.epoch, 10);
+        page.entries.forEach(e => seen.add(e[0]));
+    }
+    assert.equal(seen.size, 25);
+    assert.deepEqual(sync.list(page.cursor, page.epoch, 10).entries, []);
+});
+
+test("list: entries written by 1.5 (no sequence number) are numbered, so paging still works", async (t) => {
+    const { dir } = await setup(t);
+    const fs = require("fs");
+    for (let i = 0; i < 5; i++) {
+        fs.mkdirSync(dir + "/files/old" + i + ".md", { recursive: true });
+        fs.writeFileSync(dir + "/files/old" + i + ".md/metadata", JSON.stringify({ action: "created", type: "file", sha1: "x", mtime: 1 }));
+        fs.writeFileSync(dir + "/files/old" + i + ".md/1", "x".repeat(i));
+    }
+    const Storage = require("../../libs/fs/Storage");
+    const storage = new Storage(dir + "/files/");
+    await storage.init();
+    const sync = new SyncService(storage);
+    const first = sync.list(null, null, 2);
+    const second = sync.list(first.cursor, first.epoch, 2);
+    const third = sync.list(second.cursor, second.epoch, 2);
+    const all = [...first.entries, ...second.entries, ...third.entries].map(e => e[0]).sort();
+    assert.deepEqual(all, ["old0.md", "old1.md", "old2.md", "old3.md", "old4.md"]);
+    assert.equal(third.more, false);
+
+    await storage.fillSizes();
+    assert.equal(storage.index.get("old3.md").size, 3);
+});
+
+test("stored files know their size", async (t) => {
+    const { sync } = await setup(t);
+    const r = await sync.put("img.png", file(1000), null, Buffer.alloc(12345), LAPTOP);
+    assert.equal(r.meta.size, 12345);
+});

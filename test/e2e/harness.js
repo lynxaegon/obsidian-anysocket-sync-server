@@ -223,6 +223,7 @@ class Device {
     }
 
     state() { return this.call("state"); }
+    resetPeak() { return this.call("resetPeak"); }
     notices() { return this.call("notices"); }
     press(label) { return this.call("press", { label }); }
     tree() { return this.call("tree"); }

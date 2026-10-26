@@ -4504,7 +4504,7 @@ var LocalIndex = class {
     this.saveTimeout = setTimeout(() => {
       this.saveTimeout = null;
       this.save();
-    }, 500);
+    }, 2e3);
   }
   async save() {
     clearTimeout(this.saveTimeout);
@@ -4554,18 +4554,34 @@ function toUint8(data) {
   throw new Error("unexpected content");
 }
 function toArrayBuffer(bytes) {
+  if (bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength) {
+    return bytes.buffer;
+  }
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
 }
 var depth = (path) => path.split("/").length;
-var PARALLEL = 8;
-async function parallel(items, limit, fn) {
-  let next = 0;
-  const worker = async () => {
-    while (next < items.length) {
-      await fn(items[next++]);
+var PARALLEL_FILES = 8;
+var PARALLEL_BYTES = 16 * 1024 * 1024;
+var PAGE = 5e3;
+var transferStats = { maxFiles: 0, maxBytes: 0 };
+async function parallel(items, size, fn) {
+  const running = /* @__PURE__ */ new Set();
+  let bytes = 0;
+  for (const item of items) {
+    const weight = Math.max(0, size(item) || 0);
+    while (running.size > 0 && (running.size >= PARALLEL_FILES || bytes + weight > PARALLEL_BYTES)) {
+      await Promise.race(running);
     }
-  };
-  await Promise.all(new Array(Math.min(limit, items.length)).fill(0).map(worker));
+    bytes += weight;
+    transferStats.maxFiles = Math.max(transferStats.maxFiles, running.size + 1);
+    transferStats.maxBytes = Math.max(transferStats.maxBytes, bytes);
+    const task = fn(item).finally(() => {
+      bytes -= weight;
+      running.delete(task);
+    });
+    running.add(task);
+  }
+  await Promise.all(running);
 }
 var SyncV2 = class {
   constructor(xSync) {
@@ -4577,6 +4593,7 @@ var SyncV2 = class {
     this.expectedRenames = /* @__PURE__ */ new Set();
     this.device = null;
     this.features = [];
+    this.skipped = /* @__PURE__ */ new Map();
     this.xSync = xSync;
     this.index = new LocalIndex(xSync.storage.fsInternal);
   }
@@ -4634,6 +4651,23 @@ var SyncV2 = class {
   async clockOffset() {
     return await this.time() - Date.now();
   }
+  get maxFileSize() {
+    const mb = Number(this.plugin.settings.maxFileSize) || 0;
+    return mb > 0 ? mb * 1024 * 1024 : 0;
+  }
+  tooLarge(size) {
+    return this.maxFileSize > 0 && size > this.maxFileSize;
+  }
+  skip(path, size) {
+    if (!this.skipped.has(path)) {
+      this.skipped.set(path, size);
+      this.xSync.status.emit("change", this.status.state, this.status.state);
+    }
+  }
+  localSize(path) {
+    const file = app.vault.getAbstractFileByPath(path);
+    return file && file.stat ? file.stat.size : 0;
+  }
   async hashFile(path) {
     const data = await this.storage.readBinary(path);
     if (data == null) {
@@ -4666,6 +4700,10 @@ var SyncV2 = class {
       if (entry && entry.type === "file" && entry.action === "created" && entry.lmtime === file.stat.mtime) {
         continue;
       }
+      if (this.tooLarge(file.stat.size)) {
+        this.skip(file.path, file.stat.size);
+        continue;
+      }
       const hashed = await this.hashFile(file.path);
       if (!hashed) {
         continue;
@@ -4684,6 +4722,9 @@ var SyncV2 = class {
     for (const path of this.index.paths()) {
       const entry = this.index.get(path);
       if (seen.has(path) || entry.action === "deleted") {
+        continue;
+      }
+      if (this.skipped.has(path) && app.vault.getAbstractFileByPath(path)) {
         continue;
       }
       if (!entry.synced) {
@@ -4741,40 +4782,58 @@ var SyncV2 = class {
     if (full) {
       this.index.resetCursor();
     }
-    const list = await this.rpc(LARGE_TIMEOUT).sync.list(this.index.cursor === null ? false : this.index.cursor, this.index.epoch || false);
-    const remote = new Map(list.entries);
-    if (list.full) {
+    let total = 0;
+    let done = 0;
+    const progress = () => this.status.set("syncing", { done: ++done, total });
+    let cursor = this.index.cursor === null ? false : this.index.cursor;
+    let epoch = this.index.epoch || false;
+    let fullPass = null;
+    let seen = null;
+    let page;
+    do {
+      page = await this.rpc(LARGE_TIMEOUT).sync.list(cursor, epoch, PAGE);
+      if (page.full) {
+        fullPass = true;
+        seen = /* @__PURE__ */ new Set();
+      } else if (fullPass === null) {
+        fullPass = false;
+      }
+      const toApply = [];
+      for (const [path, meta] of page.entries) {
+        if (seen) {
+          seen.add(path);
+        }
+        if (!Utils_default.isSyncable(path)) {
+          continue;
+        }
+        const entry = this.index.get(path);
+        if (entry && sameState(entry, meta)) {
+          entry.synced = { sha1: meta.sha1 || null, action: meta.action, seq: meta.seq };
+          this.index.set(path, entry);
+          continue;
+        }
+        if (entry && isDirty(entry)) {
+          continue;
+        }
+        toApply.push([path, meta]);
+      }
+      total += toApply.length;
+      await this.applyRemote(toApply, progress);
+      cursor = page.cursor;
+      epoch = page.epoch;
+    } while (page.more && this.running);
+    if (fullPass && this.running) {
       for (const path of this.index.paths()) {
         const entry = this.index.get(path);
-        if (entry.synced && !remote.has(path)) {
+        if (entry.synced && !seen.has(path)) {
           entry.synced = null;
           this.index.set(path, entry);
         }
       }
     }
-    const toApply = [];
-    for (const [path, meta] of remote) {
-      if (!Utils_default.isSyncable(path)) {
-        continue;
-      }
-      const entry = this.index.get(path);
-      if (entry && sameState(entry, meta)) {
-        entry.synced = { sha1: meta.sha1 || null, action: meta.action, seq: meta.seq };
-        this.index.set(path, entry);
-        continue;
-      }
-      if (entry && isDirty(entry)) {
-        continue;
-      }
-      toApply.push([path, meta]);
-    }
-    const dirty = this.index.dirtyPaths();
-    const total = toApply.length + dirty.length;
-    let done = 0;
-    const progress = () => this.status.set("syncing", { done: ++done, total });
-    await this.applyRemote(toApply, progress);
+    total += this.index.dirtyPaths().length;
     await this.pushAll(progress);
-    this.index.setCursor(list.epoch, list.cursor);
+    this.index.setCursor(epoch, cursor);
     await this.index.save();
     this.status.set("synced", { at: Date.now() });
   }
@@ -4805,7 +4864,7 @@ var SyncV2 = class {
       await this.safely(path, () => this.applyCreated(path, meta, renamedTo.get(path)));
       progress();
     }
-    await parallel(creates.filter((e) => e[1].type !== "folder"), PARALLEL, async ([path, meta]) => {
+    await parallel(creates.filter((e) => e[1].type !== "folder"), (e) => e[1].size, async ([path, meta]) => {
       if (!this.running)
         return;
       await this.safely(path, () => this.applyCreated(path, meta, renamedTo.get(path)));
@@ -4891,6 +4950,10 @@ var SyncV2 = class {
     }
     if (!await this.localUnchanged(path)) {
       return this.keepLocal(path);
+    }
+    if (meta.size != null && this.tooLarge(meta.size)) {
+      this.skip(path, meta.size);
+      return;
     }
     await this.download(path, meta);
     this.activity.add("downloaded", path);
@@ -5015,7 +5078,7 @@ var SyncV2 = class {
     for (const group of [0, 1, 2, 3, 4]) {
       const paths = dirty.filter((path) => rank(this.index.get(path)) === group);
       if (group === 2 || group === 3) {
-        await parallel(paths, PARALLEL, pushOne);
+        await parallel(paths, (path) => this.localSize(path), pushOne);
       } else {
         for (const path of paths) {
           await pushOne(path);
@@ -5158,6 +5221,10 @@ var SyncV2 = class {
         synced: entry ? entry.synced : null
       });
       return this.schedulePush(file.path, 0);
+    }
+    if (this.tooLarge(file.stat.size)) {
+      this.skip(file.path, file.stat.size);
+      return;
     }
     const hashed = await this.hashFile(file.path);
     if (!hashed) {
@@ -5719,6 +5786,7 @@ var XSync = class {
     this.device = null;
     this.revoked = false;
     this.pendingNotice = null;
+    this.transferStats = transferStats;
     this.plugin = plugin;
     this.status = new Status(plugin);
     this.activity = new Activity();
@@ -6475,6 +6543,23 @@ var SyncPanelModal = class extends import_obsidian9.Modal {
         });
       }
     }
+    const skipped = this.xSync.v2.skipped;
+    if (skipped.size > 0) {
+      this.section(el, "Not synced on this device", "file-x");
+      const list = el.createDiv({ cls: "anysocket-panel-list" });
+      const limit = this.plugin.settings.maxFileSize;
+      const row = list.createDiv({ cls: "anysocket-panel-item" });
+      const body = row.createDiv({ cls: "anysocket-panel-item-body" });
+      body.createDiv({
+        cls: "anysocket-panel-item-title",
+        text: skipped.size + (skipped.size === 1 ? " file is" : " files are") + " larger than " + (limit >= 1e3 ? limit / 1e3 + " GB" : limit + " MB")
+      });
+      const names = [...skipped.entries()].slice(0, 5).map(([p, size]) => p.split("/").pop() + " (" + Math.round(size / 1048576) + " MB)");
+      body.createDiv({
+        cls: "anysocket-panel-item-desc",
+        text: names.join(", ") + (skipped.size > 5 ? ", \u2026" : "") + '. They stay on the devices that have them. Change "Largest file to sync" in the settings to include them.'
+      });
+    }
     this.section(el, "Devices", "monitor-smartphone");
     const devicesEl = el.createDiv({ cls: "anysocket-panel-list" });
     if (this.devicesError) {
@@ -6613,13 +6698,14 @@ var DEFAULT_SETTINGS = {
   autoSync: true,
   notifications: 1,
   deviceName: getDefaultDeviceName(),
-  debug: false
+  debug: false,
+  maxFileSize: import_obsidian10.Platform.isMobile ? 200 : 0
 };
 var AnySocketSyncPlugin = class extends import_obsidian10.Plugin {
   constructor() {
     super(...arguments);
     this.VERSION = "1.6.0";
-    this.BUILD = "1793024470616";
+    this.BUILD = "1793024857013";
     this.isReady = false;
     this.panel = null;
   }
@@ -6789,6 +6875,18 @@ var AnySocketSyncSettingTab = class extends import_obsidian10.PluginSettingTab {
       dropdown.addOption("900", "15m");
       dropdown.setValue(this.plugin.settings.delayedSync.toString()).onChange(async (value) => {
         this.plugin.settings.delayedSync = parseInt(value);
+        await this.plugin.saveSettings();
+      });
+    });
+    new import_obsidian10.Setting(containerEl).setName("Largest file to sync").setDesc("Bigger files stay on the devices that have them (the sync panel lists them). On phones, very large files can run out of memory.").addDropdown((dropdown) => {
+      dropdown.addOption("0", "No limit");
+      for (const mb of [50, 100, 200, 500, 1e3, 2e3]) {
+        dropdown.addOption(String(mb), mb >= 1e3 ? mb / 1e3 + " GB" : mb + " MB");
+      }
+      dropdown.setValue(String(this.plugin.settings.maxFileSize || 0)).onChange(async (value) => {
+        this.plugin.settings.maxFileSize = parseInt(value);
+        this.plugin.xSync.v2.skipped.clear();
+        this.plugin.xSync.v2.index.resetCursor();
         await this.plugin.saveSettings();
       });
     });

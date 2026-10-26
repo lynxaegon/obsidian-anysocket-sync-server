@@ -142,7 +142,8 @@ module.exports = class Server {
                 peer.data.autoSync = !!value;
             },
             sync: {
-                list: (cursor, epoch) => this.sync.list(cursor, typeof epoch === "string" ? epoch : null),
+                list: (cursor, epoch, limit) => this.sync.list(cursor, typeof epoch === "string" ? epoch : null,
+                    typeof limit === "number" && limit > 0 ? Math.min(limit, 20000) : 5000),
                 meta: (filePath) => {
                     this.assertPath(filePath);
                     return this.sync.meta(filePath);
