@@ -44,6 +44,18 @@ function state() {
         return { loaded: false };
     }
     const x = plugin.xSync;
+    if (!x || !x.status) {
+        // the 1.5.0 plugin
+        return {
+            loaded: true,
+            legacyPlugin: true,
+            version: plugin.VERSION,
+            connected: !!(x && x.anysocket && x.anysocket.isConnected),
+            statusBar: x && x.xNotify && x.xNotify.statusBarMessage ? x.xNotify.statusBarMessage.innerText : "",
+            activity: [],
+            plugins: { disabled: app.plugins.disabled, enabled: app.plugins.enabled }
+        };
+    }
     return {
         loaded: true,
         status: x.status.state,
@@ -177,6 +189,11 @@ const commands = {
         const end = Date.now() + timeout;
         while (Date.now() < end) {
             const x = plugin && plugin.xSync;
+            if (x && !x.status) {
+                // the 1.5.0 plugin has nothing to wait on
+                await sleep(500);
+                return state();
+            }
             if (x && x.engine === x.v2) {
                 await x.v2.queue;
                 await sleep(50);

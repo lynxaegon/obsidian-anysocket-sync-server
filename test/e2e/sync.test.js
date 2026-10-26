@@ -326,3 +326,27 @@ test("typing fast (many saves in a row) ends with the last text everywhere", asy
     assert.equal(await phone.read("typing.md"), text);
     assert.equal(server.stored("typing.md").data.toString(), text);
 });
+
+test("changes made while the server is down are not missed (and renames keep their history)", async (t) => {
+    const { server, laptop, phone } = await pair(t);
+    await laptop.write("doomed.md", "delete me during the outage");
+    await laptop.write("draft.md", "v1");
+    await laptop.settle();
+    await laptop.write("draft.md", "v2");
+    await waitSame([laptop, phone]);
+
+    await server.stop();
+    await laptop.waitState(s => s.status === "offline" || s.status === "unreachable", "offline");
+    await laptop.remove("doomed.md");
+    await laptop.rename("draft.md", "Published/final.md");
+    await laptop.write("new during outage.md", "new");
+    assert.equal((await laptop.state()).pending >= 3, true, "the status counts what is waiting");
+    assert.match((await laptop.state()).text, /Offline · \d+ waiting/);
+
+    await server.start();
+    await laptop.waitState(s => s.engine === "v2" && s.status === "synced", "back", 40000);
+    const tree = await waitSame([laptop, phone], 40000);
+    assert.ok(!tree["doomed.md"], "the delete was not missed");
+    assert.ok(tree["Published/final.md"] && tree["new during outage.md"]);
+    assert.equal(server.versions("Published/final.md").length, 2, "the rename kept the history");
+});

@@ -115,7 +115,9 @@ class Server {
         if (!fs.existsSync(metaFile)) return null;
         const meta = JSON.parse(fs.readFileSync(metaFile, "utf8"));
         if (meta.action !== "created" || meta.type !== "file") return { meta };
-        return { meta, data: fs.readFileSync(path.join(this.dataDir, "files", p, String(meta.mtime))) };
+        // a 1.5 server writes the metadata before the content
+        const content = path.join(this.dataDir, "files", p, String(meta.mtime));
+        return fs.existsSync(content) ? { meta, data: fs.readFileSync(content) } : null;
     }
 
     versions(p) {

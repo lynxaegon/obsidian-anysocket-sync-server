@@ -4,7 +4,12 @@
 	"description": "Self-Hosted synchronization server for Obsidian AnySocket Sync",
 	"main": "index.js",
 	"scripts": {
-		"test": "node test.js"
+		"start": "node index.js",
+		"test": "node --test \"test/unit/*.test.js\"",
+		"test:e2e": "node --test --test-timeout=200000 --test-concurrency=4 \"test/e2e/*.test.js\"",
+		"test:compat": "node --test --test-timeout=240000 --test-concurrency=3 \"test/compat/*.test.js\"",
+		"test:perf": "node --test --test-timeout=650000 \"test/perf/*.test.js\"",
+		"test:all": "npm test && npm run test:e2e && npm run test:compat"
 	},
 	"author": "Andrei Vaduva <andrei.vaduva@gmail.com>",
 	"license": "MIT",

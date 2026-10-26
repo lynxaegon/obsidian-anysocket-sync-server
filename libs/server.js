@@ -300,15 +300,15 @@ module.exports = class Server {
     removeDevice(id) {
         const device = this.devices.remove(id);
         this.log(1, null, "Declined device:", device.name, "(" + device.id + ")");
-        this.disconnectDevice(device.id, "Device declined");
+        this.disconnectDevice(device.id, "Device declined", "declined");
         this.tellApproved({ type: "devices_changed" });
         return this.devices.public(device);
     }
 
-    disconnectDevice(id, reason) {
+    disconnectDevice(id, reason, status = "revoked") {
         for (const peer of this.online.get(id) || []) {
             peer.data.approved = false;
-            peer.send({ type: "device_status", status: "revoked" }).catch(() => {}).finally(() => {
+            peer.send({ type: "device_status", status }).catch(() => {}).finally(() => {
                 setTimeout(() => peer.disconnect(reason), 100);
             });
         }

@@ -25,9 +25,15 @@ class TAbstractFile {
 }
 
 class TFile extends TAbstractFile {
+    // like Obsidian: a deleted file keeps its last known stat
     get stat() {
-        const s = fs.statSync(this.vault.abs(this.path));
-        return { mtime: Math.round(s.mtimeMs), ctime: Math.round(s.ctimeMs), size: s.size };
+        try {
+            const s = fs.statSync(this.vault.abs(this.path));
+            this._stat = { mtime: Math.round(s.mtimeMs), ctime: Math.round(s.ctimeMs), size: s.size };
+        } catch (e) {
+            // gone: the last one we saw
+        }
+        return this._stat;
     }
     get basename() {
         return this.name.replace(/\.[^.]*$/, "");

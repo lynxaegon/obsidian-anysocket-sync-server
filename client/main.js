@@ -4272,7 +4272,7 @@ var Status = class extends import_Events2.default {
       case "waiting_approval":
         return "Waiting for approval";
       case "revoked":
-        return "Device removed";
+        return info.declined ? "Request declined" : "Device removed";
       case "syncing":
         return info.total > 1 ? "Syncing " + Math.min(info.done, info.total) + "/" + info.total : "Syncing\u2026";
       case "synced": {
@@ -4307,7 +4307,7 @@ var Status = class extends import_Events2.default {
       case "waiting_approval":
         return "This device needs to be approved before it can sync. Approve it from a device that already syncs (AnySocket Sync \u2192 Devices), or on the server.";
       case "revoked":
-        return "This device was removed from sync. Approve it again on the server or from another device to sync again.";
+        return info.declined ? "This device's request to sync was declined. It asks again the next time Obsidian starts, or when you change the settings." : "This device was removed from sync. Approve it again on the server or from another device to sync again.";
       case "syncing":
         return info.total > 1 ? "Syncing " + Math.min(info.done, info.total) + " of " + info.total + " changes\u2026" : "Syncing\u2026";
       case "synced":
@@ -4557,6 +4557,16 @@ function toArrayBuffer(bytes) {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
 }
 var depth = (path) => path.split("/").length;
+var PARALLEL = 8;
+async function parallel(items, limit, fn) {
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      await fn(items[next++]);
+    }
+  };
+  await Promise.all(new Array(Math.min(limit, items.length)).fill(0).map(worker));
+}
 var SyncV2 = class {
   constructor(xSync) {
     this.peer = null;
@@ -4789,12 +4799,18 @@ var SyncV2 = class {
     }
     const creates = entries.filter((e) => e[1].action !== "deleted").sort((a, b) => depth(a[0]) - depth(b[0]));
     const deletes = entries.filter((e) => e[1].action === "deleted").sort((a, b) => depth(b[0]) - depth(a[0]));
-    for (const [path, meta] of creates) {
+    for (const [path, meta] of creates.filter((e) => e[1].type === "folder")) {
       if (!this.running)
         return;
       await this.safely(path, () => this.applyCreated(path, meta, renamedTo.get(path)));
       progress();
     }
+    await parallel(creates.filter((e) => e[1].type !== "folder"), PARALLEL, async ([path, meta]) => {
+      if (!this.running)
+        return;
+      await this.safely(path, () => this.applyCreated(path, meta, renamedTo.get(path)));
+      progress();
+    });
     for (const [path, meta] of deletes) {
       if (!this.running)
         return;
@@ -4987,7 +5003,7 @@ var SyncV2 = class {
       const ea = this.index.get(a), eb = this.index.get(b);
       return rank(ea) - rank(eb) || (ea.action === "deleted" ? depth(b) - depth(a) : depth(a) - depth(b));
     });
-    for (const path of dirty) {
+    const pushOne = async (path) => {
       if (!this.running)
         return;
       const entry = this.index.get(path);
@@ -4995,6 +5011,16 @@ var SyncV2 = class {
         await this.safely(path, () => this.push(path));
       }
       progress();
+    };
+    for (const group of [0, 1, 2, 3, 4]) {
+      const paths = dirty.filter((path) => rank(this.index.get(path)) === group);
+      if (group === 2 || group === 3) {
+        await parallel(paths, PARALLEL, pushOne);
+      } else {
+        for (const path of paths) {
+          await pushOne(path);
+        }
+      }
     }
   }
   async push(path) {
@@ -5757,13 +5783,7 @@ var XSync = class {
     if (this.lastProtocol >= 2) {
       await this.v2.index.load();
     }
-    this.registerEvent("create");
-    this.registerEvent("modify");
-    this.registerEvent("delete");
-    this.registerEvent("rename");
-    let focusChanged = Utils_default.debounce(() => this.xTimeouts.executeAll(), 500);
-    this.eventRefs["active-leaf-change"] = app.workspace.on("active-leaf-change", focusChanged);
-    this.eventRefs["layout-change"] = app.workspace.on("layout-change", focusChanged);
+    this.attachVaultEvents();
     this.anysocket.on("ready", (peer, version) => this.onReady(peer, version).catch((e) => {
       console.error("AnySocket Sync - start failed", e);
       peer.disconnect("start failed");
@@ -5790,12 +5810,6 @@ var XSync = class {
     if (this.inited == false)
       return;
     this.inited = false;
-    this.unregisterEvent("create");
-    this.unregisterEvent("modify");
-    this.unregisterEvent("delete");
-    this.unregisterEvent("rename");
-    app.workspace.offref(this.eventRefs["active-leaf-change"]);
-    app.workspace.offref(this.eventRefs["layout-change"]);
     this.stopEngine();
     this.anysocket.stop();
     this.anysocket.removeAllListeners();
@@ -5813,6 +5827,7 @@ var XSync = class {
   }
   destroy() {
     this.unload();
+    this.detachVaultEvents();
     this.anysocket.destroy();
     this.status.unmount();
   }
@@ -5888,12 +5903,12 @@ var XSync = class {
       this.status.set("offline", { pending: this.pendingCount() });
     }
   }
-  onRevoked() {
+  onRevoked(declined = false) {
     this.revoked = true;
     this.stopEngine();
     this.hidePendingNotice();
-    this.status.set("revoked");
-    this.status.notify("this device was removed from sync. Approve it again from another device or on the server to sync again.");
+    this.status.set("revoked", { declined });
+    this.status.notify(declined ? "this device's request to sync was declined. It will ask again the next time Obsidian starts." : "this device was removed from sync. Approve it again from another device or on the server to sync again.");
     clearTimeout(this.reloadTimeout);
     this.anysocket.stop();
   }
@@ -5923,8 +5938,8 @@ var XSync = class {
         if (packet.msg.status === "approved" && !this.engine) {
           this.status.notify("this device was approved, syncing now");
           this.reload(0);
-        } else if (packet.msg.status === "revoked") {
-          this.onRevoked();
+        } else if (packet.msg.status === "revoked" || packet.msg.status === "declined") {
+          this.onRevoked(packet.msg.status === "declined");
         }
         break;
       default:
@@ -6016,6 +6031,31 @@ var XSync = class {
     }
     return this.legacy.syncNow();
   }
+  attachVaultEvents() {
+    if (this.vaultEventsAttached) {
+      return;
+    }
+    this.vaultEventsAttached = true;
+    this.registerEvent("create");
+    this.registerEvent("modify");
+    this.registerEvent("delete");
+    this.registerEvent("rename");
+    let focusChanged = Utils_default.debounce(() => this.xTimeouts.executeAll(), 500);
+    this.eventRefs["active-leaf-change"] = app.workspace.on("active-leaf-change", focusChanged);
+    this.eventRefs["layout-change"] = app.workspace.on("layout-change", focusChanged);
+  }
+  detachVaultEvents() {
+    if (!this.vaultEventsAttached) {
+      return;
+    }
+    this.vaultEventsAttached = false;
+    this.unregisterEvent("create");
+    this.unregisterEvent("modify");
+    this.unregisterEvent("delete");
+    this.unregisterEvent("rename");
+    app.workspace.offref(this.eventRefs["active-leaf-change"]);
+    app.workspace.offref(this.eventRefs["layout-change"]);
+  }
   registerEvent(type) {
     this.eventRefs[type] = app.vault.on(type, async (file, ...args) => {
       if (!this.isEnabled)
@@ -6024,8 +6064,10 @@ var XSync = class {
         this.updateAttention();
       }
       try {
-        if (this.engine) {
-          await this.engine.onLocalEvent(type, file, type === "rename" ? args[0] : args);
+        if (this.engine === this.v2) {
+          await this.v2.onLocalEvent(type, file, type === "rename" ? args[0] : args);
+        } else if (this.engine === this.legacy) {
+          await this.legacy.onLocalEvent(type, file, args);
         } else if (this.lastProtocol >= 2) {
           if (this.v2.index.loaded) {
             await this.v2.onLocalEvent(type, file, type === "rename" ? args[0] : args);
@@ -6577,7 +6619,7 @@ var AnySocketSyncPlugin = class extends import_obsidian10.Plugin {
   constructor() {
     super(...arguments);
     this.VERSION = "1.6.0";
-    this.BUILD = "1793023643104";
+    this.BUILD = "1793024470616";
     this.isReady = false;
     this.panel = null;
   }
