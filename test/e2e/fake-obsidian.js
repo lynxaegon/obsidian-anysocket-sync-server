@@ -524,6 +524,14 @@ function install({ vaultDir, platform = "desktop", name = "device" }) {
     // a browser's WebSocket: send() coerces non-binary data to a string
     const WS = require("ws");
     global.WebSocket = class BrowserLikeWebSocket extends WS {
+        // a browser's second argument is subprotocols: anything else is refused, as in Obsidian
+        constructor(url, protocols) {
+            // (null becomes the string "null", which a browser accepts)
+            if (protocols != null && typeof protocols !== "string" && !Array.isArray(protocols)) {
+                throw new SyntaxError("Failed to construct 'WebSocket': The subprotocol '" + String(protocols) + "' is invalid.");
+            }
+            super(url, protocols);
+        }
         send(data, ...rest) {
             if (!(data instanceof ArrayBuffer || ArrayBuffer.isView(data))) data = String(data);
             return super.send(data, ...rest);

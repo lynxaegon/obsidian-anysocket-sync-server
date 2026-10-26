@@ -81,11 +81,11 @@ var require_anysocket_browser = __commonJS({
     !function(e, t) {
       typeof exports == "object" && typeof module2 == "object" ? module2.exports = t() : typeof define == "function" && define.amd ? define([], t) : typeof exports == "object" ? exports.AnySocket = t() : e.AnySocket = t();
     }(Object(typeof self != "undefined" ? self : exports), () => {
-      return e = { 319(e2, t2, s) {
+      return e = { 119(e2, t2, s) {
         const i = window.crypto || window.msCrypto;
         if (!i)
           throw new Error("Crypto is not supported in this browser!");
-        const r = s(42), n = "P-521", o = new TextEncoder();
+        const r = s(682), n = "P-521", o = new TextEncoder();
         e2.exports = new class {
           randomBytes(e3) {
             let t3 = new Uint8Array(e3);
@@ -129,10 +129,10 @@ var require_anysocket_browser = __commonJS({
             });
           }
         }();
-      }, 399(e2) {
+      }, 671(e2) {
         e2.exports = () => () => {
         };
-      }, 762(e2) {
+      }, 82(e2) {
         class t2 {
           constructor() {
             throw new Error(this.constructor.scheme() + " is not available in the browser \u2014 use ws");
@@ -147,8 +147,8 @@ var require_anysocket_browser = __commonJS({
             return "ipc";
           }
         } };
-      }, 809() {
-      }, 939(e2) {
+      }, 593() {
+      }, 619(e2) {
         e2.exports = class {
           constructor() {
             this.callbacks = {}, this.callbacks_once = {};
@@ -173,8 +173,8 @@ var require_anysocket_browser = __commonJS({
             s && s.forEach((e4) => e4(...t2)), s = this.callbacks_once[e3], s && (s.forEach((e4) => e4(...t2)), delete this.callbacks_once[e3]);
           }
         };
-      }, 697(e2, t2, s) {
-        const i = s(319), r = s(42), n = new TextEncoder(), o = new TextDecoder();
+      }, 553(e2, t2, s) {
+        const i = s(119), r = s(682), n = new TextEncoder(), o = new TextDecoder();
         e2.exports = new class {
           uuidv4() {
             return "xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx".replace(/[xy]/g, function(e3) {
@@ -243,7 +243,7 @@ var require_anysocket_browser = __commonJS({
             });
           }
         }();
-      }, 42(e2) {
+      }, 682(e2) {
         e2.exports = window._x = { stringToBuffer: function(e3) {
           return btoa(e3);
         }, bufferFromBase64: function(e3) {
@@ -264,10 +264,11 @@ var require_anysocket_browser = __commonJS({
             t2[s / 2] = parseInt(e3.substring(s, s + 2), 16);
           return t2;
         }, isBuffer: (e3) => !!(e3.buffer instanceof ArrayBuffer && e3.BYTES_PER_ELEMENT) };
-      }, 468(e2) {
+      }, 452(e2) {
         e2.exports = class {
-          constructor(...e3) {
-            this.ws = new WebSocket(...e3), this.ws.binaryType = "arraybuffer";
+          constructor(e3, t2) {
+            const s = typeof t2 == "string" || Array.isArray(t2) && t2.every((e4) => typeof e4 == "string");
+            this.ws = s ? new WebSocket(e3, t2) : new WebSocket(e3), this.ws.binaryType = "arraybuffer";
           }
           on(e3, t2) {
             switch (e3) {
@@ -298,12 +299,12 @@ var require_anysocket_browser = __commonJS({
           terminate() {
           }
         };
-      }, 619(e2, t2, s) {
-        const i = s(831), r = s(352), n = s(762);
-        i.Transport = { WS: s(570), HTTP: s(809), TCP: n.TCP, IPC: n.IPC }, i.Packer = { pack: r.packBytes.bind(r), unpack: r.unpackBytes.bind(r) };
-        const { AnySocketError: o, CODES: a } = s(421);
+      }, 107(e2, t2, s) {
+        const i = s(703), r = s(528), n = s(82);
+        i.Transport = { WS: s(514), HTTP: s(593), TCP: n.TCP, IPC: n.IPC }, i.Packer = { pack: r.packBytes.bind(r), unpack: r.unpackBytes.bind(r) };
+        const { AnySocketError: o, CODES: a } = s(253);
         i.Error = o, i.ERRORS = a, e2.exports = i;
-      }, 623(e2) {
+      }, 287(e2) {
         e2.exports = class {
           constructor() {
             this.routes = { _: [] }, this.routesRegexp = { _: [] }, this._upgradeCallback = null, this._process = this._process.bind(this), this._processUpgrade = this._processUpgrade.bind(this);
@@ -366,8 +367,8 @@ var require_anysocket_browser = __commonJS({
             this.onError && this.onError(e3, t2), e3.isClosed() || e3.status(404).end();
           }
         };
-      }, 352(e2, t2, s) {
-        const i = s(42);
+      }, 528(e2, t2, s) {
+        const i = s(682);
         e2.exports = new class {
           packInt32(e3) {
             const t3 = new ArrayBuffer(4);
@@ -404,8 +405,8 @@ var require_anysocket_browser = __commonJS({
             return e3 == null ? null : i.bufferFromBase64(e3);
           }
         }();
-      }, 126(e2, t2, s) {
-        s(399)("AnyPacket");
+      }, 134(e2, t2, s) {
+        s(671)("AnyPacket");
         const i = Symbol("send function");
         e2.exports = class {
           constructor(e3, t3, s2) {
@@ -415,8 +416,8 @@ var require_anysocket_browser = __commonJS({
             return this[i](e3, this.seq);
           }
         };
-      }, 606(e2, t2, s) {
-        const i = s(399)("AnyPeer"), r = s(872), n = s(389), o = s(894), a = s(126), c = s(352), h = Symbol("private protocol"), l = Symbol("packets"), u = Symbol("links"), p = s(42), { errors: d, rpcError: y } = s(421), f = function(e3) {
+      }, 494(e2, t2, s) {
+        const i = s(671)("AnyPeer"), r = s(496), n = s(189), o = s(78), a = s(134), c = s(528), h = Symbol("private protocol"), l = Symbol("packets"), u = Symbol("links"), p = s(682), { errors: d, rpcError: y } = s(253), f = function(e3) {
           return e3 === true || e3 === false || toString.call(e3) === "[object Boolean]";
         };
         e2.exports = class extends n {
@@ -607,11 +608,11 @@ var require_anysocket_browser = __commonJS({
             return false;
           }
         };
-      }, 698(e2, t2, s) {
-        const i = s(399)("AnyProtocol"), r = s(389), n = s(167), o = s(894), a = s(697), c = s(352), h = s(872), l = s(181), u = s(470), p = s(232), { errors: d } = s(421), y = Symbol("secret key"), f = Symbol("private key"), m = Symbol("auth received"), E = Symbol("nonce"), T = Symbol("e2e starting"), b = Symbol("our e2e offer"), g = Symbol("our e2e offer, being made"), _ = Symbol("e2e session"), P = Symbol("e2e promise"), w = Symbol("our auth challenge"), O = Symbol("peer auth challenge"), S = Symbol("heartbeat timer"), C = Symbol("heartbeats missed"), A = Symbol("heartbeat ponged"), I = Symbol("last received"), k = typeof performance != "undefined" && performance.now ? () => performance.now() : () => Date.now(), R = Symbol("authTimeout"), v = Symbol("e2eTimeout"), N = Symbol("liveness probes waiting"), x = Symbol("frames held while switching"), D = Symbol("bytes parked before the handshake");
+      }, 882(e2, t2, s) {
+        const i = s(671)("AnyProtocol"), r = s(189), n = s(487), o = s(78), a = s(553), c = s(528), h = s(496), l = s(557), u = s(382), p = s(640), { errors: d } = s(253), y = Symbol("secret key"), f = Symbol("private key"), m = Symbol("auth received"), E = Symbol("nonce"), T = Symbol("e2e starting"), b = Symbol("our e2e offer"), g = Symbol("our e2e offer, being made"), _ = Symbol("e2e session"), P = Symbol("e2e promise"), w = Symbol("our auth challenge"), O = Symbol("peer auth challenge"), S = Symbol("heartbeat timer"), C = Symbol("heartbeats missed"), A = Symbol("heartbeat ponged"), I = Symbol("last received"), k = typeof performance != "undefined" && performance.now ? () => performance.now() : () => Date.now(), v = Symbol("authTimeout"), R = Symbol("e2eTimeout"), N = Symbol("liveness probes waiting"), x = Symbol("frames held while switching"), D = Symbol("bytes parked before the handshake");
         e2.exports = class extends r {
           constructor(e3, t3, s2) {
-            super(), this._seq = 0, this[y] = null, this[f] = null, this[E] = null, this[T] = false, this[b] = null, this[_] = null, this[P] = null, this[w] = null, this[O] = null, this.authenticated = false, this.e2eRequired = false, this.protocolVersion = h.PROTOCOL_VERSION_LEGACY, this.remoteProtocolVersion = null, this.remoteInstanceID = null, this.capabilities = [], this[S] = 0, this[C] = 0, this[A] = true, this[I] = 0, this[R] = false, this[v] = false, this[N] = null, this[x] = [], this[D] = 0, this.remoteMaxFrame = null, this.peerID = t3.id, this.peer = t3, this.options = Object.assign({ authTimeout: 5e3, e2eTimeout: 5e3, replyTimeout: 3e4, heartbeatInterval: 5e3, heartbeatsMaxMissed: 2, heartbeatEnabled: true, disconnectOnReplyTimeout: false, maxPartialPackets: 64, maxMessageSize: 1 / 0, maxHandshakeMessageSize: 65536, sendWindow: 8, maxPacketSize: 4194304, sendHighWaterMark: 16777216, capabilities: h.CAPABILITIES, allowLegacyE2E: true, e2eCiphers: null, requireE2E: false, duplicateProbeTimeout: 2e3 }, s2), this.connectionID = this.peer.connectionID, this.anysocket = e3, this._packetQueue = new n(this, this.processPacketQueue), this._linkPacketQueue = new n(this, this.processLinkPacketQueue), this._recvPacketQueue = new n(this, this.processRecvPacketQueue), this._recvLinkPacketQueue = new n(this, this.processRecvLinkPacketQueue), this._packets = {}, this.changeState(h.PROTOCOL_STATES.ESTABLISHED), this.ENCRYPTION_STATE = h.PROTOCOL_ENCRYPTION.PLAIN, this.peer.on("message", (e4, t4) => {
+            super(), this._seq = 0, this[y] = null, this[f] = null, this[E] = null, this[T] = false, this[b] = null, this[_] = null, this[P] = null, this[w] = null, this[O] = null, this.authenticated = false, this.e2eRequired = false, this.protocolVersion = h.PROTOCOL_VERSION_LEGACY, this.remoteProtocolVersion = null, this.remoteInstanceID = null, this.capabilities = [], this[S] = 0, this[C] = 0, this[A] = true, this[I] = 0, this[v] = false, this[R] = false, this[N] = null, this[x] = [], this[D] = 0, this.remoteMaxFrame = null, this.peerID = t3.id, this.peer = t3, this.options = Object.assign({ authTimeout: 5e3, e2eTimeout: 5e3, replyTimeout: 3e4, heartbeatInterval: 5e3, heartbeatsMaxMissed: 2, heartbeatEnabled: true, disconnectOnReplyTimeout: false, maxPartialPackets: 64, maxMessageSize: 1 / 0, maxHandshakeMessageSize: 65536, sendWindow: 8, maxPacketSize: 4194304, sendHighWaterMark: 16777216, capabilities: h.CAPABILITIES, allowLegacyE2E: true, e2eCiphers: null, requireE2E: false, duplicateProbeTimeout: 2e3 }, s2), this.connectionID = this.peer.connectionID, this.anysocket = e3, this._packetQueue = new n(this, this.processPacketQueue), this._linkPacketQueue = new n(this, this.processLinkPacketQueue), this._recvPacketQueue = new n(this, this.processRecvPacketQueue), this._recvLinkPacketQueue = new n(this, this.processRecvLinkPacketQueue), this._packets = {}, this.changeState(h.PROTOCOL_STATES.ESTABLISHED), this.ENCRYPTION_STATE = h.PROTOCOL_ENCRYPTION.PLAIN, this.peer.on("message", (e4, t4) => {
               this._received(), this._recvPacketQueue.push({ peer: e4, recv: t4, state: this.ENCRYPTION_STATE });
             }), this.peer.isClient() && !this.peerID ? (this.changeState(h.PROTOCOL_STATES.AUTHING), this.send(this._authPacket())) : !this.peerID && this.peer.limitReceive && this.peer.limitReceive(this.options.maxHandshakeMessageSize + 4096), this.peerID && (this.isProxy() && (this.protocolVersion = h.PROTOCOL_VERSION, this.remoteProtocolVersion = h.PROTOCOL_VERSION, this.e2eRequired = !!this.options.requireE2E, this.remoteMaxFrame = this.options.relayMaxFrame || null), this.changeState(h.PROTOCOL_STATES.CONNECTED));
           }
@@ -945,25 +946,25 @@ var require_anysocket_browser = __commonJS({
             if (this.state != h.PROTOCOL_STATES.DISCONNECTED)
               switch (this.state = e3, this.state) {
                 case h.PROTOCOL_STATES.ESTABLISHED:
-                  this[R] = setTimeout(() => {
+                  this[v] = setTimeout(() => {
                     this.disconnect("auth timed out");
                   }, this.options.authTimeout), this._linkPacketQueue.pause(), this._recvLinkPacketQueue.pause();
                   break;
                 case h.PROTOCOL_STATES.AUTHING:
-                  clearTimeout(this[R]), this[R] = setTimeout(() => {
+                  clearTimeout(this[v]), this[v] = setTimeout(() => {
                     this.disconnect("auth timed out");
                   }, this.options.authTimeout), this._linkPacketQueue.pause(), this._recvLinkPacketQueue.pause();
                   break;
                 case h.PROTOCOL_STATES.CONNECTED:
-                  clearTimeout(this[R]), this[R] = false, clearTimeout(this[v]), this[v] = false, this._linkPacketQueue.resume(), this._recvLinkPacketQueue.resume(), this[x].length && this._packetQueue.unshift(this[x].splice(0)), this._heartbeat();
+                  clearTimeout(this[v]), this[v] = false, clearTimeout(this[R]), this[R] = false, this._linkPacketQueue.resume(), this._recvLinkPacketQueue.resume(), this[x].length && this._packetQueue.unshift(this[x].splice(0)), this._heartbeat();
                   break;
                 case h.PROTOCOL_STATES.SWITCHING_PROTOCOL:
-                  clearTimeout(this[S]), this[v] = setTimeout(() => {
+                  clearTimeout(this[S]), this[R] = setTimeout(() => {
                     this.disconnect("e2e timed out");
                   }, this.options.e2eTimeout), this._linkPacketQueue.pause(), this._recvLinkPacketQueue.pause();
                   break;
                 case h.PROTOCOL_STATES.DISCONNECTED: {
-                  clearTimeout(this[R]), this[R] = false, clearTimeout(this[v]), this[v] = false, this._settleProbes(false);
+                  clearTimeout(this[v]), this[v] = false, clearTimeout(this[R]), this[R] = false, this._settleProbes(false);
                   const e4 = this[x].splice(0).concat(this._packetQueue.getQueue(), this._linkPacketQueue.getQueue());
                   this._packetQueue.pause(), this._packetQueue.kill(), this._linkPacketQueue.pause(), this._linkPacketQueue.kill(), this._recvPacketQueue.pause(), this._recvPacketQueue.kill(), this._recvLinkPacketQueue.pause(), this._recvLinkPacketQueue.kill();
                   for (const t3 of e4)
@@ -1164,8 +1165,8 @@ var require_anysocket_browser = __commonJS({
             return [o.TYPE.INTERNAL, o.TYPE.LINK].indexOf(e3) != -1;
           }
         };
-      }, 831(e2, t2, s) {
-        const i = s(399)("AnySocket"), r = s(809), n = s(389), o = s(697), a = s(42), c = s(872), h = s(809), l = s(623), u = s(894), p = s(300), { errors: d, reasonText: y } = s(421), f = (e3) => {
+      }, 703(e2, t2, s) {
+        const i = s(671)("AnySocket"), r = s(593), n = s(189), o = s(553), a = s(682), c = s(496), h = s(593), l = s(287), u = s(78), p = s(868), { errors: d, reasonText: y } = s(253), f = (e3) => {
           if (e3 instanceof Error)
             return e3.message || e3.name || "Error";
           if (typeof e3 == "string")
@@ -1182,7 +1183,7 @@ var require_anysocket_browser = __commonJS({
         }), Object.getPrototypeOf(Uint8Array.prototype), typeof Buffer != "undefined" ? Buffer.prototype : Object.prototype]), E = /* @__PURE__ */ new Set(["__proto__", "constructor", "prototype"]), T = (e3, t3, s2) => Object.assign({}, e3.options, { requireE2E: e3.requiresE2E() || t3 === "required", relayMaxFrame: b(e3.remoteMaxFrame(), s2) }), b = (e3, t3) => {
           const s2 = [e3, t3].filter((e4) => Number.isInteger(e4) && e4 > 0);
           return s2.length ? Math.min(...s2) : null;
-        }, g = Symbol("peers connected"), _ = Symbol("ready peers"), P = Symbol("transports"), w = Symbol("onForward"), O = Symbol("onPeerConnected"), S = Symbol("onPeerReady"), C = Symbol("onPeerDisconnected"), A = Symbol("onPeerInternalMessage"), I = Symbol("findTransport"), k = Symbol("startTransport"), R = Symbol("httpServerFor"), v = Symbol("keepsExisting"), N = Symbol("probeExisting"), x = Symbol("duplicate already probed"), D = Symbol("http bundle js"), L = Symbol("HTTPServer"), B = Symbol("HTTP servers by port"), F = Symbol("maintainers"), H = Symbol("standby duplicates of 0.4.x peers"), Y = Symbol("holdStandby"), K = Symbol("stop() calls so far"), M = s(606), q = s(698), U = s(460);
+        }, g = Symbol("peers connected"), _ = Symbol("ready peers"), P = Symbol("transports"), w = Symbol("onForward"), O = Symbol("onPeerConnected"), S = Symbol("onPeerReady"), C = Symbol("onPeerDisconnected"), A = Symbol("onPeerInternalMessage"), I = Symbol("findTransport"), k = Symbol("startTransport"), v = Symbol("httpServerFor"), R = Symbol("keepsExisting"), N = Symbol("probeExisting"), x = Symbol("duplicate already probed"), D = Symbol("http bundle js"), L = Symbol("HTTPServer"), B = Symbol("HTTP servers by port"), F = Symbol("maintainers"), H = Symbol("standby duplicates of 0.4.x peers"), Y = Symbol("holdStandby"), K = Symbol("stop() calls so far"), M = s(494), q = s(882), U = s(340);
         class j extends n {
           constructor(e3) {
             return super(), this.options = Object.assign({}, e3), this._started = false, this.id = o.uuidv4(), this.instanceID = o.uuidv4(), this.http = new l(), i("AnySocketID:", this.id), this.rpc = {}, this.rpcGuard = this.options.rpcGuard || null, this[g] = {}, this[_] = {}, this[P] = {}, this[L] = null, this[B] = /* @__PURE__ */ new Map(), this[F] = /* @__PURE__ */ new Set(), this[H] = /* @__PURE__ */ new Map(), this[K] = 0, typeof window == "undefined" && (this[D] = r.readFileSync("//../../dist/anysocket.browser.js")), this;
@@ -1251,7 +1252,7 @@ var require_anysocket_browser = __commonJS({
                 throw new Error("ipc needs a path");
             } else if (["http", "ws"].indexOf(s2) == -1 && t3.port == null)
               throw new Error("Invalid port!");
-            return e3.toLowerCase() == "ws" ? this[R](t3).then(({ server: e4, port: s3 }) => this[k]("ws", Object.assign({}, t3, { server: e4 })).then(() => s3)) : e3.toLowerCase() == "http" ? this[R](t3).then(({ port: e4 }) => e4) : s2 == "tcp" && t3.port && this[B].has(t3.port) ? this[B].get(t3.port).then(({ server: e4, port: s3 }) => this[k]("tcp", Object.assign({}, t3, { server: e4 })).then(() => s3)) : this[k](e3, t3).then((e4) => e4 === void 0 ? t3.port : e4);
+            return e3.toLowerCase() == "ws" ? this[v](t3).then(({ server: e4, port: s3 }) => this[k]("ws", Object.assign({}, t3, { server: e4 })).then(() => s3)) : e3.toLowerCase() == "http" ? this[v](t3).then(({ port: e4 }) => e4) : s2 == "tcp" && t3.port && this[B].has(t3.port) ? this[B].get(t3.port).then(({ server: e4, port: s3 }) => this[k]("tcp", Object.assign({}, t3, { server: e4 })).then(() => s3)) : this[k](e3, t3).then((e4) => e4 === void 0 ? t3.port : e4);
           }
           connect(e3, t3, s2, r2) {
             return new Promise((n2, o2) => {
@@ -1302,7 +1303,7 @@ var require_anysocket_browser = __commonJS({
               throw delete this[P][s2.id], e4;
             });
           }
-          [R](e3) {
+          [v](e3) {
             const t3 = e3.port == null ? 80 : e3.port, s2 = t3 !== 0;
             if (s2 && this[B].has(t3))
               return this[B].get(t3);
@@ -1358,7 +1359,7 @@ var require_anysocket_browser = __commonJS({
             return t3.from != e3 ? (i("Dropping forward: " + e3 + " tried to relay as " + t3.from), void (s2 && s2.disconnect("Invalid forward packet!"))) : this.canProxy(t3.from, t3.to) ? void (this.hasDirectPeer(t3.to) ? this[_][t3.to].forward(t3).catch(() => {
             }) : i("Dropping forward: " + t3.to + " is gone")) : (i("Dropping forward: no permitted route from " + t3.from + " to " + t3.to), void (s2 && s2.disconnect("Invalid forward packet!")));
           }
-          [v](e3, t3) {
+          [R](e3, t3) {
             const s2 = e3.remoteInstanceID();
             if (s2 && t3.remoteInstanceID && s2 !== t3.remoteInstanceID)
               return false;
@@ -1381,7 +1382,7 @@ var require_anysocket_browser = __commonJS({
             if (r2 && !e3.isProxy() && !r2.isProxy() && !e3[x] && r2.remoteInstanceID() && e3.remoteInstanceID && r2.remoteInstanceID() !== e3.remoteInstanceID)
               return this[N](r2, e3, t3, s2);
             if (r2) {
-              if (this[v](r2, e3))
+              if (this[R](r2, e3))
                 return t3 && t3(r2), e3.peerID = null, void e3.disconnect("Duplicated AnySocket ID found!");
               i("Replacing the duplicate connection to", e3.peerID), delete this[_][r2.id], r2._supersede("Superseded by the agreed connection"), this.emit("disconnected", r2, "Superseded by the agreed connection");
             }
@@ -1549,8 +1550,8 @@ var require_anysocket_browser = __commonJS({
           }
         }
         e2.exports = j;
-      }, 232(e2, t2, s) {
-        const i = s(181), r = () => {
+      }, 640(e2, t2, s) {
+        const i = s(557), r = () => {
           const e3 = globalThis.crypto;
           if (!e3 || !e3.subtle)
             throw new Error("WebCrypto is not available, so the built-in auth cannot be used");
@@ -1592,10 +1593,10 @@ var require_anysocket_browser = __commonJS({
             return false;
           }
         }, compareBytes: a };
-      }, 470(e2, t2, s) {
-        const i = s(181), r = (() => {
+      }, 382(e2, t2, s) {
+        const i = s(557), r = (() => {
           try {
-            const e3 = s(319);
+            const e3 = s(119);
             return e3 && typeof e3.createCipheriv == "function" ? e3 : null;
           } catch (e3) {
             return null;
@@ -1735,7 +1736,7 @@ var require_anysocket_browser = __commonJS({
         }, supportedCiphers: f, compareBytes: E, _resetSupport: function() {
           p = null, y = null;
         } };
-      }, 181(e2) {
+      }, 557(e2) {
         const t2 = { FINAL: 1, ENCRYPTED: 2, BINARY: 4, FIRST: 16, REPLY: 8 }, s = 4294967295, i = new TextEncoder(), r = new TextDecoder(), n = (e3) => e3 instanceof Uint8Array ? e3 : e3 instanceof ArrayBuffer ? new Uint8Array(e3) : e3 && e3.buffer instanceof ArrayBuffer ? new Uint8Array(e3.buffer, e3.byteOffset, e3.byteLength) : i.encode(String(e3));
         e2.exports = { FLAGS: t2, HEADER_SIZE: 6, LENGTH_HINT: 4, ID_BYTES: 16, idToBytes: (e3) => {
           const t3 = new Uint8Array(16), s2 = String(e3 || "");
@@ -1814,8 +1815,8 @@ var require_anysocket_browser = __commonJS({
             s2[e4] = t3.charCodeAt(e4);
           return s2;
         }, text: (e3) => r.decode(n(e3)), bytes: (e3) => i.encode(e3) };
-      }, 300(e2, t2, s) {
-        const i = s(399)("Maintainer"), r = s(389);
+      }, 868(e2, t2, s) {
+        const i = s(671)("Maintainer"), r = s(189);
         e2.exports = class extends r {
           constructor(e3, t3, s2) {
             super(), this.anysocket = e3, this.target = t3, this.policy = Object.assign({ minDelay: 500, maxDelay: 3e4, factor: 2, jitter: 0.2, giveUpAfter: 1 / 0, stableAfter: 1e4 }, s2), this.peer = null, this.peerID = null, this.attempt = 0, this.active = true, this._timer = null, this._stable = null, this._failingSince = null, this._dialing = false, this._onConnected = (e4) => {
@@ -1863,8 +1864,8 @@ var require_anysocket_browser = __commonJS({
             clearTimeout(this._stable), this._stable = null;
           }
         };
-      }, 894(e2, t2, s) {
-        const i = s(399)("Packet"), r = s(352), n = s(181), o = s(872), a = (e3) => r.unpackInt32(e3.substr(2, 4)), c = (e3) => parseInt(e3.substr(1, 1)), h = (e3) => e3 instanceof Uint8Array || e3 instanceof ArrayBuffer || typeof Buffer != "undefined" && Buffer.isBuffer(e3), l = Symbol.for("anysocket.attachments"), u = Symbol("segments");
+      }, 78(e2, t2, s) {
+        const i = s(671)("Packet"), r = s(528), n = s(557), o = s(496), a = (e3) => r.unpackInt32(e3.substr(2, 4)), c = (e3) => parseInt(e3.substr(1, 1)), h = (e3) => e3 instanceof Uint8Array || e3 instanceof ArrayBuffer || typeof Buffer != "undefined" && Buffer.isBuffer(e3), l = Symbol.for("anysocket.attachments"), u = Symbol("segments");
         class p {
           constructor(e3) {
             this.seq = 0, this.type = 0, this.buffer = [], this.data = null, this.parseError = false, this.binary = false, this.assembled = null, this.assembledAt = 0, e3 !== void 0 && (this.data = e3);
@@ -2023,8 +2024,8 @@ var require_anysocket_browser = __commonJS({
           }
         }
         e2.exports = { data: (e3) => new p(e3 === void 0 ? {} : e3), buffer: () => new p(), getSeq: (e3) => n.isFrame(e3) ? n.getSeq(e3) : a(n.legacyText(e3)), getType: (e3) => n.isFrame(e3) ? n.getType(e3) : c(n.legacyText(e3)), isForwardPacket: (e3) => n.isFrame(e3) ? n.getType(e3) == o.PACKET_TYPE.FORWARD : n.legacyText(e3).substr(0, 1) == o.PACKET_TYPE.FORWARD, isBinaryPayload: h, ATTACHMENTS: l, TYPE: o.PACKET_TYPE };
-      }, 460(e2, t2, s) {
-        const i = s(977), r = s(8);
+      }, 340(e2, t2, s) {
+        const i = s(665), r = s(336);
         e2.exports = class extends i {
           constructor(e3, t3, s2, i2) {
             super(i2), this.id = s2, this.anysocketID = t3, this.type = e3 ? r.TYPE.CLIENT : r.TYPE.SERVER, this.isProxy = true, this.init();
@@ -2041,7 +2042,7 @@ var require_anysocket_browser = __commonJS({
           onDisconnect() {
           }
         };
-      }, 167(e2) {
+      }, 487(e2) {
         e2.exports = class {
           constructor(e3, t2) {
             this.context = e3, this.worker = t2, this.items = [], this.head = 0, this.paused = false, this.running = false;
@@ -2081,7 +2082,7 @@ var require_anysocket_browser = __commonJS({
             this.head >= this.items.length && (this.items.length = 0, this.head = 0);
           }
         };
-      }, 872(e2) {
+      }, 496(e2) {
         const t2 = { PACKET_TYPE: { AUTH: 1, INTERNAL: 2, LINK: 3, SWITCH: 4, HEARTBEAT: 5, FORWARD: 6, AUTH_CONFIRM: 7 }, PACKET_LENGTH: { FULL: 1, PARTIAL: 2 }, INTERNAL_PACKET_TYPE: { NETWORK: 1, PROXY: 2, RPC: 3, RPC_NOTIFY: 4, SYNCED_TIME: 5 }, PROTOCOL_STATES: { ESTABLISHED: 0, AUTHING: 1, CONNECTED: 2, SWITCHING_PROTOCOL: 3, DISCONNECTED: 4 }, PROTOCOL_ENCRYPTION: { PLAIN: 1, E2EE: 2 }, PROTOCOL_VERSION: 1, PROTOCOL_VERSION_LEGACY: 0, CAPABILITIES: [], MAX_PACKET_SIZE: 1048576, HTTP_CONTENT_TYPES: { txt: "text/plain;charset=utf-8", html: "text/html;charset=utf-8", htm: "text/html;charset=utf-8", css: "text/css;charset=utf-8", js: "text/javascript;charset=utf-8", md: "text/markdown;charset=utf-8", sh: "application/x-shellscript;charset=utf-8", svg: "image/svg+xml;charset=utf-8", xml: "text/xml;charset=utf-8", png: "image/png", jpeg: "image/jpeg", jpg: "image/jpeg", jpe: "image/jpeg", gif: "image/gif", ttf: "font/ttf", woff: "font/woff", woff2: "font/woff2", eot: "application/vnd.ms-fontobject", gz: "application/gzip", bz: "application/x-bzip", bz2: "application/x-bzip2", xz: "application/x-xz", zst: "application/zst" } };
         for (let e3 in t2)
           t2[e3]._string = (s) => {
@@ -2091,7 +2092,7 @@ var require_anysocket_browser = __commonJS({
             return s;
           };
         e2.exports = t2;
-      }, 421(e2) {
+      }, 253(e2) {
         class t2 extends Error {
           constructor(e3, t3, s2) {
             super(t3), this.name = "AnySocketError", this.code = e3, s2 && Object.assign(this, s2);
@@ -2105,8 +2106,8 @@ var require_anysocket_browser = __commonJS({
           const i2 = e3.code == 404 ? s.RPC_NOT_FOUND : e3.code == 403 ? s.RPC_FORBIDDEN : s.RPC_FAILED;
           return new t2(i2, String(e3.error), { error: e3.error, details: e3.details, status: e3.code });
         } };
-      }, 977(e2, t2, s) {
-        const i = s(389), r = s(697), n = s(8);
+      }, 665(e2, t2, s) {
+        const i = s(189), r = s(553), n = s(336);
         e2.exports = class extends i {
           constructor(e3) {
             super(), this.connectionID = r.uuidv4(), this.connected = true, this.socket = e3, this.type = n.TYPE.NONE, this.inited = false;
@@ -2132,8 +2133,8 @@ var require_anysocket_browser = __commonJS({
             throw new Error("onDisconnect() must be implemented");
           }
         };
-      }, 8(e2, t2, s) {
-        const i = s(389), r = s(697);
+      }, 336(e2, t2, s) {
+        const i = s(189), r = s(553);
         class n extends i {
           constructor(e3, t3) {
             super(), this.id = r.uuidv4(), this.options = Object.assign({}, t3), this.type = e3, this.peers = /* @__PURE__ */ new Map(), this.started = false;
@@ -2194,8 +2195,8 @@ var require_anysocket_browser = __commonJS({
         c = () => {
           throw new Error("static scheme() must be implemented");
         }, (a = "scheme") in (o = n) ? Object.defineProperty(o, a, { value: c, enumerable: true, configurable: true, writable: true }) : o[a] = c, e2.exports = n, n.TYPE = { CLIENT: "client", SERVER: "server", HTTP: "http" };
-      }, 47(e2, t2, s) {
-        const i = s(977);
+      }, 439(e2, t2, s) {
+        const i = s(665);
         e2.exports = class extends i {
           onConnect() {
             this.socket.on("close", () => {
@@ -2225,11 +2226,11 @@ var require_anysocket_browser = __commonJS({
             this.socket && (this.socket.close(), this.socket.terminate(), this.socket = null);
           }
         };
-      }, 570(e2, t2, s) {
+      }, 514(e2, t2, s) {
         let i;
         const r = typeof window != "undefined" && window.document !== void 0;
-        i = s(468);
-        const n = s(8), o = s(47);
+        i = s(452);
+        const n = s(336), o = s(439);
         e2.exports = class extends n {
           constructor(e3, t3) {
             super(e3, t3);
@@ -2252,11 +2253,20 @@ var require_anysocket_browser = __commonJS({
             return new Promise((t3, s2) => {
               let n2 = false, o2 = null;
               this.options.cookies && (o2 = { headers: { Cookie: this._formatCookies(this.options.cookies) } }), this.options.connectTimeout && (o2 = Object.assign(o2 || {}, { handshakeTimeout: this.options.connectTimeout })), r || (o2 = Object.assign(o2 || {}, { maxPayload: this._maxPayload() }));
-              let a = new i((e3 ? "ws" : "wss") + "://" + this.options.ip + ":" + this.options.port + "/", o2);
-              a.on("open", (e4) => {
-                n2 = true, this._applyTcpKeepAlive(a), this.addPeer(this._peer(a)), t3();
-              }), a.on("error", (i2) => {
-                e3 || n2 ? s2(i2) : this.onConnect(true).then(t3).catch(s2), n2 = false;
+              const a = (e3 ? "ws" : "wss") + "://" + this.options.ip + ":" + this.options.port + "/";
+              let c = r ? new i(a) : new i(a, o2), h = null;
+              r && this.options.connectTimeout && (h = setTimeout(() => {
+                if (!n2) {
+                  try {
+                    c.close();
+                  } catch (e4) {
+                  }
+                  s2(new Error("connect timed out after " + this.options.connectTimeout + "ms"));
+                }
+              }, this.options.connectTimeout)), c.on("open", (e4) => {
+                clearTimeout(h), n2 = true, this._applyTcpKeepAlive(c), this.addPeer(this._peer(c)), t3();
+              }), c.on("error", (i2) => {
+                clearTimeout(h), e3 || n2 ? s2(i2) : this.onConnect(true).then(t3).catch(s2), n2 = false;
               });
             });
           }
@@ -2292,15 +2302,15 @@ var require_anysocket_browser = __commonJS({
             return t3.join("; ");
           }
         };
-      }, 389(e2, t2, s) {
-        typeof window != "undefined" && window.document, e2.exports = s(939);
+      }, 189(e2, t2, s) {
+        typeof window != "undefined" && window.document, e2.exports = s(619);
       } }, t = {}, function s(i) {
         var r = t[i];
         if (r !== void 0)
           return r.exports;
         var n = t[i] = { exports: {} };
         return e[i](n, n.exports, s), n.exports;
-      }(619);
+      }(107);
       var e, t;
     });
   }
@@ -3724,8 +3734,7 @@ var import_Events = __toESM(require_Events());
 var import_anysocket_browser = __toESM(require_anysocket_browser());
 var CONNECT_OPTIONS = {
   heartbeatInterval: 10 * 1e3,
-  heartbeatsMaxMissed: 5,
-  connectTimeout: 15 * 1e3
+  heartbeatsMaxMissed: 5
 };
 var BACKOFF = [1e3, 2e3, 5e3, 1e4, 3e4];
 var AnysocketManager = class extends import_Events.default {
@@ -5827,13 +5836,15 @@ var XSync = class {
       return "ios";
     if (import_obsidian6.Platform.isAndroidApp)
       return "android";
+    if (import_obsidian6.Platform.isMobile)
+      return "mobile";
     if (import_obsidian6.Platform.isMacOS)
       return "macos";
     if (import_obsidian6.Platform.isWin)
       return "windows";
     if (import_obsidian6.Platform.isLinux)
       return "linux";
-    return import_obsidian6.Platform.isMobile ? "mobile" : "desktop";
+    return "desktop";
   }
   get lastProtocol() {
     return parseInt(app.loadLocalStorage(PROTOCOL_KEY) || "0") || 0;
@@ -6384,9 +6395,6 @@ var VersionHistoryModal = class extends import_obsidian7.Modal {
   }
 };
 
-// src/main.ts
-var import_os = require("os");
-
 // src/libs/modals/FilesHistoryModal.ts
 var import_obsidian8 = require("obsidian");
 var FilesHistoryModal = class extends import_obsidian8.SuggestModal {
@@ -6675,8 +6683,12 @@ var import_ua_parser_js = __toESM(require_ua_parser());
 var import_anysocket_browser3 = __toESM(require_anysocket_browser());
 var deviceInfo = new import_ua_parser_js.UAParser(navigator.userAgent).getDevice();
 function getDefaultDeviceName() {
-  if (import_obsidian10.Platform.isDesktop) {
-    return (0, import_os.hostname)();
+  if (import_obsidian10.Platform.isDesktopApp && !import_obsidian10.Platform.isMobile) {
+    try {
+      return require("os").hostname();
+    } catch (e) {
+      return "Computer";
+    }
   }
   if (deviceInfo.model) {
     return deviceInfo.model;
@@ -6705,7 +6717,7 @@ var AnySocketSyncPlugin = class extends import_obsidian10.Plugin {
   constructor() {
     super(...arguments);
     this.VERSION = "1.6.0";
-    this.BUILD = "1793024857013";
+    this.BUILD = "1793026686657";
     this.isReady = false;
     this.panel = null;
   }
@@ -6927,7 +6939,10 @@ async function testConnection(settings) {
   anysocket.authPacket = () => password;
   anysocket.onAuth = async (packet) => await Utils_default.getSHA(packet.id.substring(0, 16) + settings.password + packet.id.substring(16)) == packet.auth;
   try {
-    const peer = await anysocket.connect("ws", settings.host, settings.port, { connectTimeout: 1e4 });
+    const peer = await Promise.race([
+      anysocket.connect("ws", settings.host, settings.port),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 1e4))
+    ]);
     await peer.e2e();
     const info = peer.e2eInfo && peer.e2eInfo();
     const modern = peer.protocolVersion && peer.protocolVersion() >= 1;

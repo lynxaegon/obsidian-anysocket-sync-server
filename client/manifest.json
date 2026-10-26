@@ -3,7 +3,7 @@
 	"name": "AnySocket Sync",
 	"version": "1.6.0",
 	"minAppVersion": "0.15.0",
-	"description": "Self-Hosted synchronization for you Vault using AnySocket",
+	"description": "Self-hosted, encrypted sync for your vault, using AnySocket",
 	"author": "Andrei Vaduva",
 	"authorUrl": "https://github.com/lynxaegon",
 	"isDesktopOnly": false
