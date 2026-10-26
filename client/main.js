@@ -263,7 +263,7 @@ var require_anysocket_browser = __commonJS({
           for (let s = 0; s < e3.length; s += 2)
             t2[s / 2] = parseInt(e3.substring(s, s + 2), 16);
           return t2;
-        }, isBuffer: (e3) => !!(e3.buffer instanceof ArrayBuffer && e3.BYTES_PER_ELEMENT) };
+        }, isBuffer: (e3) => !!(e3 && e3.buffer instanceof ArrayBuffer && e3.BYTES_PER_ELEMENT) };
       }, 452(e2) {
         e2.exports = class {
           constructor(e3, t2) {
@@ -6717,7 +6717,7 @@ var AnySocketSyncPlugin = class extends import_obsidian10.Plugin {
   constructor() {
     super(...arguments);
     this.VERSION = "1.6.0";
-    this.BUILD = "1793027096796";
+    this.BUILD = "1793028164442";
     this.isReady = false;
     this.panel = null;
   }
