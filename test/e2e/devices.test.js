@@ -180,8 +180,7 @@ test("upgrading a 1.5 server: devices that synced recently are approved, new one
     }));
 
     const server = await new Server(t, { dataDir }).start();
-    assert.match(server.logs, /Backing up data before running 1\.6\.0/);
-    assert.ok(fs.readdirSync(path.join(dataDir, "backups")).some(n => n.startsWith("pre-1.6.0-")));
+    assert.equal(fs.existsSync(path.join(dataDir, "backups")), false, "the data is not copied");
 
     const laptop = new Device(t, server, { name: "Laptop" });
     const phone = new Device(t, server, { name: "Phone" });

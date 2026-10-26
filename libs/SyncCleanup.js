@@ -34,7 +34,12 @@ module.exports = class SyncCleanup {
     }
 
     async run() {
-        let allDevicesLastOnline = this.findMinLastOnline();
+        // a delete from before the upgrade to 1.6.0 waits for every device 1.5.x knew (as it
+        // did then), so the upgrade never purges anything that was still recoverable; a delete
+        // made since waits for the approved devices
+        const upgradedAt = (XDB.data && XDB.data.upgraded_at) || 0;
+        const legacyLastOnline = this.legacyMinLastOnline();
+        const approvedLastOnline = this.findMinLastOnline();
         let items = await XStorage.iterate();
 
         let now = Date.now();
@@ -51,12 +56,14 @@ module.exports = class SyncCleanup {
                             await XStorage.pruneVersions(item, keep);
                         }
                         break;
-                    case "deleted":
+                    case "deleted": {
                         // only once every device had the chance to see the delete
+                        const allDevicesLastOnline = metadata.mtime < upgradedAt ? legacyLastOnline : approvedLastOnline;
                         if (metadata.mtime + this.keepDeletedTime < now && allDevicesLastOnline > metadata.mtime) {
                             await XStorage.delete(item);
                         }
                         break;
+                    }
                 }
             }
             catch(e) {
@@ -70,7 +77,11 @@ module.exports = class SyncCleanup {
         if (this.devices && this.devices.hasApproved()) {
             return this.devices.minLastOnline();
         }
+        return this.legacyMinLastOnline();
+    }
 
+    // every device 1.5.x knew, by name (not updated by 1.6.0)
+    legacyMinLastOnline() {
         let minLastOnline = -1;
         for(let id of XDB.devices.list()) {
             const lastOnline = XDB.devices.get(id, "last_online");

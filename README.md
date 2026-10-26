@@ -66,7 +66,7 @@ The commands work whether the server is running or not.
 
 ## Upgrading from 1.5.x
 - Update the server; your devices update their plugin on their own the next time they connect.
-- Before 1.6.0 first runs, it copies your data to `data/backups/pre-1.6.0-<date>/`. Once everything works you can delete that folder.
+- Your data stays as it is: 1.6.0 only adds to it, and nothing that was recoverable before (deleted files, history) is removed by the upgrade.
 - Devices that synced in the 30 days before the upgrade are approved automatically. Any other device waits for approval (see Devices).
 - Once all your devices run 1.6.0, set `"allow_legacy_clients": false` in `config.js`, so every connection uses the stronger authentication.
 - Going back to 1.5.x works on the same data.

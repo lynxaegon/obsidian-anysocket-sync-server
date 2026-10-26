@@ -118,7 +118,8 @@ test("the upgrade itself: a live 1.5 setup moves to 1.6.0 without losing or dupl
 
     // 2. the server is replaced by 1.6.0, on the same data
     const server = await new Server(t, { dataDir: old.dataDir }).start();
-    assert.match(server.logs, /Backing up data before running 1\.6\.0/);
+    assert.doesNotMatch(server.logs, /Backing up/);
+    assert.equal(fs.existsSync(path.join(old.dataDir, "backups")), false, "no copy of the data");
 
     // 3. the 1.5 plugins connect, are updated, and come back as 1.6.0
     for (const device of [laptop, phone]) {

@@ -39,8 +39,6 @@ config.data_dir = "data";
 const dataPath = path.resolve(process.env.ANYSOCKET_SYNC_DATA || path.join(__dirname, config.data_dir));
 config.data_path = dataPath;
 
-const version = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8")).version;
-require("./libs/Backup").beforeUpgrade(dataPath, version);
 
 const cleanup = config.cleanup || {};
 global.XStorage = new (require("./libs/fs/Storage"))(dataPath + "/files/", {

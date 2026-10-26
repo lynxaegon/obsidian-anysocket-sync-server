@@ -5,7 +5,6 @@ const path = require("path");
 const { tmpdir, storage } = require("../helpers/tmp");
 const Helpers = require("../../libs/helpers");
 const { merge, copyPath, isMergeable, sanitize } = require("../../libs/sync/merge");
-const Backup = require("../../libs/Backup");
 
 test("paths: only vault-relative paths are accepted", () => {
     for (const ok of ["a.md", "Folder/Sub/b.md", "Notes/my file (1).md", "x/.hidden", "日本/ノート.md"]) {
@@ -53,33 +52,14 @@ test("copy names are readable and valid file names", () => {
     assert.ok(Helpers.isSafePath(copyPath("F/N.md", "../../evil", time, () => false)));
 });
 
-test("backup: data is copied once before a new version runs", (t) => {
-    const dir = tmpdir(t, "backup");
-    fs.mkdirSync(path.join(dir, "files", "a.md"), { recursive: true });
-    fs.writeFileSync(path.join(dir, "files", "a.md", "metadata"), "{}");
-    fs.mkdirSync(path.join(dir, "db"));
-    fs.writeFileSync(path.join(dir, "db", "data.json"), "{}");
-
-    const target = Backup.beforeUpgrade(dir, "1.6.0");
-    assert.ok(target);
-    assert.ok(fs.existsSync(path.join(target, "files", "a.md", "metadata")));
-    assert.ok(fs.existsSync(path.join(target, "db", "data.json")));
-    assert.equal(Backup.beforeUpgrade(dir, "1.6.0"), null, "only once");
-    assert.ok(Backup.beforeUpgrade(dir, "1.7.0"), "again for the next version");
-});
-
-test("backup: nothing to back up on a fresh server", (t) => {
-    const dir = tmpdir(t, "backup");
-    assert.equal(Backup.beforeUpgrade(dir, "1.6.0"), null);
-    assert.equal(Backup.beforeUpgrade(dir, "1.6.0"), null);
-});
-
 test("cleanup: old versions and old deletes go, recent ones stay", async (t) => {
     const { storage: s, db } = await storage(t);
     const Devices = require("../../libs/Devices");
     const SyncCleanup = require("../../libs/SyncCleanup");
     const devices = new Devices(db);
     const laptop = devices.register({ id: "laptop-00001", secret: "laptop-secret-123456", name: "Laptop" }).device;
+    // a server that has run 1.6.0 for a while
+    db.data.upgraded_at = 1;
 
     const now = Date.now();
     for (let i = 1; i <= 4; i++) {
@@ -113,4 +93,24 @@ test("binary detection ignores case", () => {
     assert.equal(Helpers.isBinary("a.png"), true);
     assert.equal(Helpers.isBinary("note.md"), false);
     assert.equal(Helpers.isBinary("README"), false);
+});
+
+test("cleanup: the upgrade never purges deletes that were still recoverable under 1.5", async (t) => {
+    const { storage: s, db } = await storage(t);
+    const Devices = require("../../libs/Devices");
+    const SyncCleanup = require("../../libs/SyncCleanup");
+    const now = Date.now();
+    // 1.5 knew a device that hasn't been online for ages, which kept every delete around
+    db.data.devices = { "Old phone": { last_online: now - 600 * 86400000 }, "Laptop": { last_online: now } };
+    const devices = new Devices(db);
+    const laptop = devices.register({ id: "laptop-00001", secret: "laptop-secret-123456", name: "Laptop" }).device;
+    laptop.last_online = now;
+
+    await s.storeEntry("deleted-before-the-upgrade.md", { type: "file", action: "deleted", mtime: now - 100 * 86400000, sha1: "x" });
+    db.data.upgraded_at = now - 50 * 86400000;
+    await s.storeEntry("deleted-after-the-upgrade.md", { type: "file", action: "deleted", mtime: now - 10 * 86400000, sha1: "x" });
+
+    await new SyncCleanup({ cleanup: { keep_deleted_files_time: 3 * 86400 } }, devices).run();
+    assert.ok(await s.readMetadata("deleted-before-the-upgrade.md"), "kept: the device 1.5 waited for never came back");
+    assert.equal(await s.readMetadata("deleted-after-the-upgrade.md"), null, "approved devices have all seen it");
 });
