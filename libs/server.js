@@ -10,6 +10,11 @@ const PROTOCOL = 2;
 const FEATURES = ["devices", "rename", "incremental", "merge"];
 // a device has this long to say who it is
 const IDENTIFY_TIMEOUT = 60 * 1000;
+// a wrong password is answered this late, so guessing is slow (a right one is never delayed)
+const FAILED_AUTH_DELAY = 2000;
+// above this many failures a minute it looks like guessing: answer later still, and say so
+const FAILED_AUTH_ALARM = 30;
+const FAILED_AUTH_ALARM_DELAY = 4000;
 
 module.exports = class Server {
     constructor(config) {
@@ -39,8 +44,14 @@ module.exports = class Server {
             rpcGuard: (peer, rpcPath, args) => this.canCall(peer, rpcPath, args)
         });
         // legacy auth, still sent by every client so that old servers accept new clients
-        this.server.onAuth = (packet) => {
-            return packet.auth == Helpers.getSHA(packet.id.substring(0, 16) + this.config.password + packet.id.substring(16));
+        this.failedAuths = [];
+        this.server.onAuth = async (packet) => {
+            const ok = typeof packet.id === "string" &&
+                packet.auth == Helpers.getSHA(packet.id.substring(0, 16) + this.config.password + packet.id.substring(16));
+            if (!ok) {
+                await this.slowDownFailedAuth();
+            }
+            return ok;
         };
         this.server.authPacket = () => {
             return Helpers.getSHA(this.server.id.substring(0, 16) + this.config.password + this.server.id.substring(16));
@@ -72,6 +83,19 @@ module.exports = class Server {
         await this.server.listen("ws", listenOptions);
         console.log("[SERVER] " + this.version + " listening on port " + this.config.port + (this.config.certs ? " (TLS)" : ""));
         await this.listenAdmin();
+    }
+
+    // anysocket 1.0 awaits onAuth, so this holds a guessing connection without slowing anyone else
+    async slowDownFailedAuth() {
+        const now = Date.now();
+        this.failedAuths = this.failedAuths.filter(time => now - time < 60 * 1000);
+        this.failedAuths.push(now);
+        const alarm = this.failedAuths.length > FAILED_AUTH_ALARM;
+        if (alarm && (!this.lastAuthAlarm || now - this.lastAuthAlarm > 60 * 1000)) {
+            this.lastAuthAlarm = now;
+            console.warn("[SERVER] " + this.failedAuths.length + " failed logins in the last minute: someone may be guessing the password");
+        }
+        await new Promise(resolve => setTimeout(resolve, alarm ? FAILED_AUTH_ALARM_DELAY : FAILED_AUTH_DELAY));
     }
 
     log(level, peer, ...args) {

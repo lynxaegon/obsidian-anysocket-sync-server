@@ -6717,7 +6717,7 @@ var AnySocketSyncPlugin = class extends import_obsidian10.Plugin {
   constructor() {
     super(...arguments);
     this.VERSION = "1.6.0";
-    this.BUILD = "1793026686657";
+    this.BUILD = "1793027096796";
     this.isReady = false;
     this.panel = null;
   }
