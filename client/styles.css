@@ -6,22 +6,25 @@
 /* Mobile Floating Indicator */
 .anysocket-mobile-indicator {
 	position: fixed;
-	width: 32px;
-	height: 32px;
+	right: 12px;
+	bottom: calc(12px + var(--safe-area-inset-bottom, 0px));
+	z-index: 999;
+	width: 28px;
+	height: 28px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	pointer-events: none;
-	margin-bottom: 1px;
-
-	right: 12px;
-	bottom: 12px;
-	z-index: 999;
+	border-radius: 50%;
+	background: var(--background-secondary);
+	box-shadow: var(--shadow-s);
+	color: var(--anysocket-tone);
+	cursor: pointer;
+	pointer-events: auto;
 }
 
 .anysocket-mobile-indicator svg {
-	width: 12px;
-	height: 12px;
+	width: 14px;
+	height: 14px;
 }
 
 /* Files History Modal */
@@ -313,4 +316,254 @@ body.is-mobile .anysocket-version-history .markdown-preview-view {
 	body.is-mobile .anysocket-version-history .markdown-preview-view {
 		padding: var(--size-4-6) var(--size-4-8);
 	}
+}
+
+/* ---- status (status bar + mobile indicator) ---- */
+.anysocket-status,
+.anysocket-mobile-indicator,
+.anysocket-panel-status {
+	--anysocket-tone: var(--text-muted);
+}
+[data-tone="ok"] { --anysocket-tone: var(--color-green); }
+[data-tone="busy"] { --anysocket-tone: var(--interactive-accent); }
+[data-tone="warn"] { --anysocket-tone: var(--color-orange); }
+[data-tone="error"] { --anysocket-tone: var(--color-red); }
+[data-tone="muted"] { --anysocket-tone: var(--text-faint); }
+
+.anysocket-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.anysocket-status-icon {
+	display: inline-flex;
+	color: var(--anysocket-tone);
+}
+
+.anysocket-status-icon svg {
+	width: 13px;
+	height: 13px;
+}
+
+.anysocket-status.is-spinning .anysocket-status-icon svg,
+.anysocket-mobile-indicator.is-spinning svg {
+	animation: anysocket-spin 1.2s linear infinite;
+}
+
+@keyframes anysocket-spin {
+	to { transform: rotate(360deg); }
+}
+
+/* ---- notices with buttons ---- */
+.anysocket-notice-text {
+	white-space: pre-wrap;
+}
+
+.anysocket-notice-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--size-4-2);
+	margin-top: var(--size-4-2);
+}
+
+/* ---- sync panel ---- */
+.anysocket-panel {
+	width: min(560px, 100vw);
+}
+
+.anysocket-panel-status {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-3);
+	padding: var(--size-4-3);
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+}
+
+.anysocket-panel-status-icon {
+	color: var(--anysocket-tone);
+	display: flex;
+}
+
+.anysocket-panel-status-icon svg {
+	width: 28px;
+	height: 28px;
+}
+
+.anysocket-panel-status-text {
+	flex: 1;
+	min-width: 0;
+}
+
+.anysocket-panel-status-title {
+	font-weight: var(--font-semibold);
+	font-size: var(--font-ui-medium);
+}
+
+.anysocket-panel-status-desc {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	margin-top: 2px;
+}
+
+.anysocket-panel-section {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	margin: var(--size-4-5) 0 var(--size-4-2);
+	font-weight: var(--font-semibold);
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.anysocket-panel-section svg {
+	width: 14px;
+	height: 14px;
+}
+
+.anysocket-panel-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-2);
+}
+
+.anysocket-panel-list.is-compact {
+	gap: 0;
+	max-height: 240px;
+	overflow-y: auto;
+}
+
+.anysocket-panel-item {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-3);
+	padding: var(--size-4-2) var(--size-4-3);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+}
+
+.anysocket-panel-item.is-attention {
+	border-color: var(--color-orange);
+	background: rgba(var(--color-orange-rgb), 0.06);
+}
+
+.anysocket-panel-item.is-muted {
+	opacity: 0.6;
+}
+
+.anysocket-panel-item-icon {
+	display: flex;
+	color: var(--text-muted);
+}
+
+.anysocket-panel-item-body {
+	flex: 1;
+	min-width: 0;
+}
+
+.anysocket-panel-item-title {
+	font-weight: var(--font-medium);
+	overflow-wrap: anywhere;
+}
+
+.anysocket-panel-item-desc {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	overflow-wrap: anywhere;
+}
+
+.anysocket-panel-item-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--size-4-2);
+	justify-content: flex-end;
+}
+
+.anysocket-panel-activity {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	padding: var(--size-2-2) var(--size-4-2);
+	border-radius: var(--radius-s);
+	font-size: var(--font-ui-small);
+}
+
+.anysocket-panel-activity.is-clickable {
+	cursor: pointer;
+}
+
+.anysocket-panel-activity.is-clickable:hover {
+	background: var(--background-modifier-hover);
+}
+
+.anysocket-panel-activity.is-warn .anysocket-panel-activity-icon {
+	color: var(--color-orange);
+}
+
+.anysocket-panel-activity-icon {
+	display: flex;
+	color: var(--text-faint);
+}
+
+.anysocket-panel-activity-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+.anysocket-panel-activity-text {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.anysocket-panel-activity-time {
+	color: var(--text-faint);
+	white-space: nowrap;
+}
+
+.anysocket-panel-empty {
+	color: var(--text-faint);
+	font-size: var(--font-ui-small);
+	padding: var(--size-4-2) 0;
+}
+
+.anysocket-panel-about {
+	margin-top: var(--size-4-5);
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+}
+
+body.is-phone .anysocket-panel-item {
+	flex-wrap: wrap;
+}
+
+body.is-phone .anysocket-panel-item-actions {
+	width: 100%;
+	justify-content: flex-start;
+}
+
+/* ---- version history: messages and binary previews ---- */
+.anysocket-version-history .version-message {
+	color: var(--text-faint);
+	cursor: default;
+}
+
+.anysocket-version-history .version-binary-preview {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: var(--size-4-4);
+	overflow: auto;
+}
+
+.anysocket-version-history .version-binary-preview img {
+	max-width: 100%;
+	max-height: 100%;
+	object-fit: contain;
 }

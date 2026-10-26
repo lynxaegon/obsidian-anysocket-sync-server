@@ -1,19 +1,32 @@
-let peerList = [];
 const AnySocket = require("anysocket");
 const Helpers = require("./helpers");
 const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const Devices = require("./Devices");
+const SyncService = require("./sync/SyncService");
+
+const PROTOCOL = 2;
+const FEATURES = ["devices", "rename", "incremental", "merge"];
+// a device has this long to say who it is
+const IDENTIFY_TIMEOUT = 60 * 1000;
 
 module.exports = class Server {
     constructor(config) {
         this.config = config;
         this.debug = 1;
-        if(config.logs && config.logs.level) {
+        if(config.logs && config.logs.level !== undefined) {
             this.debug = config.logs.level;
         }
+        this.version = JSON.parse(fs.readFileSync(path.join(config.app_dir, "package.json"), "utf8")).version;
 
-        // Expose peerList for testing
-        this.getPeerList = () => peerList;
-        this.setPeerList = (list) => { peerList = list; };
+        this.devices = new Devices(XDB);
+        this.sync = new SyncService(XStorage, {
+            debug: this.debug,
+            onChange: (paths, device) => this.broadcastChanges(paths, device)
+        });
+        // deviceId -> Set of peers
+        this.online = new Map();
 
         this.server = new AnySocket({
             // anysocket 1.0 mutual auth (challenge/response, binds the e2e keys)
@@ -23,8 +36,7 @@ module.exports = class Server {
                 secret: this.config.password,
                 optional: this.config.allow_legacy_clients !== false
             },
-            // nothing is callable over an unencrypted link
-            rpcGuard: (peer) => peer.isE2EEnabled()
+            rpcGuard: (peer, rpcPath) => this.canCall(peer, rpcPath)
         });
         // legacy auth, still sent by every client so that old servers accept new clients
         this.server.onAuth = (packet) => {
@@ -34,6 +46,13 @@ module.exports = class Server {
             return Helpers.getSHA(this.server.id.substring(0, 16) + this.config.password + this.server.id.substring(16));
         };
 
+        this.server.rpc = this.makeRPC();
+        this.server.on("connected", this.onConnected.bind(this));
+        this.server.on("disconnected", this.onDisconnected.bind(this));
+        this.server.on("message", this.onMessage.bind(this));
+    }
+
+    async listen() {
         const listenOptions = {
             port: this.config.port,
             // anysocket 1.0 drops a silent peer, ~60s budget
@@ -43,415 +62,335 @@ module.exports = class Server {
 
         // HTTPS
         if(this.config.certs) {
-            this.server.listen("http", {
+            await this.server.listen("http", {
                 key: this.config.certs.pk,
                 cert: this.config.certs.cert,
                 port: this.config.port,
                 host: this.config.host
-            }).catch(e => console.error("[SERVER] HTTPS listen failed:", e));
+            });
         }
-        this.server.listen("ws", listenOptions).then(() => {
-            console.log("[SERVER] Listening on port " + this.config.port + (this.config.certs ? " (TLS)" : ""));
-        }).catch(e => {
-            console.error("[SERVER] Listen failed on port " + this.config.port + ":", e);
-            process.exit(1);
-        });
+        await this.server.listen("ws", listenOptions);
+        console.log("[SERVER] " + this.version + " listening on port " + this.config.port + (this.config.certs ? " (TLS)" : ""));
+        await this.listenAdmin();
+    }
 
+    log(level, peer, ...args) {
+        if (this.debug >= level) {
+            const who = peer && peer.data && peer.data.name ? peer.data.name : (peer ? peer.id : "");
+            console.log("[SERVER]" + (who ? "[" + who + "]" : ""), ...args);
+        }
+    }
 
-        this.server.on("connected", (peer) => {
-            this.debug >= 1 && console.log("[SERVER][" + peer.id + "] Connected");
-            peer._noDeviceTimeout = setTimeout(() => {
-                peer.disconnect("No device name sent...");
-            }, 5000);
-        });
-        this.server.rpc = {
-            autoSync: (value, peer) => {
-                peer.data.autoSync = value;
-            },
-            setDeviceId: (id, peer) => {
-                clearTimeout(peer._noDeviceTimeout);
-                this.debug >= 1 && console.log("[SERVER][" + peer.id + "] Device Id:", id);
-                if (!peer.data) {
-                    peer.data = {
-                        autoSync: true // default
-                    };
+    // ---- connection lifecycle ----
+
+    onConnected(peer) {
+        peer.data = peer.data || {};
+        this.log(1, peer, "Connected");
+        peer._identifyTimeout = setTimeout(() => {
+            peer.disconnect("No device information sent");
+        }, IDENTIFY_TIMEOUT);
+    }
+
+    onDisconnected(peer, reason) {
+        clearTimeout(peer._identifyTimeout);
+        this.log(1, peer, "Disconnected", reason || "");
+        const data = peer.data || {};
+        if (data.deviceId) {
+            const peers = this.online.get(data.deviceId);
+            if (peers) {
+                peers.delete(peer);
+                if (peers.size === 0) {
+                    this.online.delete(data.deviceId);
                 }
-
-                peer.data.id = id;
-                XDB.devices.add(id);
-                XDB.devices.set(id, "last_online", (new Date()).getTime());
-                peerList.push(peer);
-            },
-            onVersionCheck: this.onVersionCheck.bind(this)
+            }
+            this.devices.seen(data.deviceId);
         }
+    }
 
-        this.server.on("message", (packet) => {
-            if(packet.msg == null)
-                return;
+    // which RPCs a connection may call, at its current stage
+    canCall(peer, rpcPath) {
+        if (!peer.isE2EEnabled()) {
+            return false;
+        }
+        if (!peer.data) {
+            peer.data = {};
+        }
+        const data = peer.data;
+        const name = rpcPath[0];
+        if (name === "onVersionCheck") {
+            return true;
+        }
+        if (name === "hello") {
+            return !!data.versionOk;
+        }
+        // 1.5.x clients only get this far when their version matches, which a 1.6.0 server never does
+        if (name === "setDeviceId" || name === "autoSync") {
+            return !!data.versionOk;
+        }
+        return !!data.approved;
+    }
 
-            if(!packet.peer.isE2EEnabled()) {
-                return packet.peer.disconnect("Encryption required");
+    makeRPC() {
+        return {
+            onVersionCheck: this.onVersionCheck.bind(this),
+            hello: this.onHello.bind(this),
+            // 1.5.x: a client that never upgraded cannot sync with a 1.6.0 server
+            setDeviceId: (id, peer) => {
+                peer.disconnect("Please update the plugin");
+            },
+            autoSync: (value, peer) => {
+                peer.data.autoSync = !!value;
+            },
+            sync: {
+                list: (cursor, epoch) => this.sync.list(cursor, typeof epoch === "string" ? epoch : null),
+                meta: (filePath) => {
+                    this.assertPath(filePath);
+                    return this.sync.meta(filePath);
+                },
+                // anysocket appends the calling peer to the arguments, so an optional
+                // argument the client left out holds the peer: only a number counts
+                content: (filePath, timestamp) => {
+                    this.assertPath(filePath);
+                    return this.sync.content(filePath, typeof timestamp === "number" ? timestamp : null);
+                },
+                put: (filePath, meta, base, data, peer) => {
+                    this.assertPath(filePath);
+                    // data is optional (folders, deletes), so the peer may arrive in its place
+                    if (data && data.data && data.isE2EEnabled) {
+                        peer = data;
+                        data = null;
+                    }
+                    return this.sync.put(filePath, meta, base, data, this.deviceOf(peer));
+                },
+                rename: (from, to, base, peer) => {
+                    this.assertPath(from);
+                    this.assertPath(to);
+                    return this.sync.rename(from, to, base, this.deviceOf(peer));
+                },
+                versions: (filePath) => {
+                    this.assertPath(filePath);
+                    return this.sync.versions(filePath);
+                },
+                files: (mode) => this.sync.files(mode === "deleted" ? "deleted" : "all")
+            },
+            devices: {
+                list: () => this.listDevices(),
+                approve: (id, peer) => this.approveDevice(id, peer.data.name),
+                revoke: (id) => this.revokeDevice(id),
+                remove: (id) => this.removeDevice(id)
             }
+        };
+    }
 
-            if(!packet.peer.data || !packet.peer.data.id) {
-                return packet.peer.disconnect();
-            }
+    assertPath(filePath) {
+        if (!Helpers.isSafePath(filePath)) {
+            throw new Error("Invalid path");
+        }
+    }
 
-            const data = packet.msg.data;
-            if(!data || (data.path !== undefined && !Helpers.isSafePath(data.path))) {
-                console.warn("[SERVER][" + packet.peer.data.id + "] Rejected unsafe path:", data && data.path);
-                return;
-            }
-
-            switch (packet.msg.type) {
-                case "sync":
-                    this.onSync(packet.msg.data, packet);
-                    break;
-                case "file_event":
-                    this.onFileEvent(packet.msg.data, packet);
-                    break;
-                case "file_data":
-                    this.onFileData(packet.msg.data, packet);
-                    break;
-                case "file_history":
-                    this.onFileHistory(packet.msg.data, packet);
-                    break;
-            }
-        })
-
-        this.server.on("disconnected", (peer, reason) => {
-            clearTimeout(peer._noDeviceTimeout);
-            this.debug >= 1 && console.log("[SERVER][" + peer.id + "] Disconnected", reason);
-            peerList = peerList.filter((item) => item.id != peer.id);
-
-            if (peer.data && peer.data.id) {
-                XDB.devices.set(peer.data.id, "last_online", (new Date()).getTime());
-            }
-        });
+    deviceOf(peer) {
+        return { id: peer.data.deviceId, name: peer.data.name };
     }
 
     onVersionCheck(version, build, peer) {
         const BUILD_INFO = JSON.parse(fs.readFileSync(this.config.app_dir + "/client/build_info.json", "utf-8"));
         if (version == BUILD_INFO.version && build == BUILD_INFO.build) {
+            peer.data.versionOk = true;
             return {
-                type: "ok"
-            };
-        } else {
-            this.debug >= 1 && console.log("== Client updated from:",
-                version, "(build: " + build + ")",
-                "to:", BUILD_INFO.version, "(build: " + BUILD_INFO.build + ")");
-
-            return {
-                type: "update",
-                version: BUILD_INFO.version,
-                build: BUILD_INFO.build,
-                files: [
-                    {
-                        path: "main.js",
-                        data: fs.readFileSync(this.config.app_dir + "/client/main.js", "utf-8")
-                    },
-                    {
-                        path: "styles.css",
-                        data: fs.readFileSync(this.config.app_dir + "/client/styles.css", "utf-8")
-                    },
-                    {
-                        path: "manifest.json",
-                        data: fs.readFileSync(this.config.app_dir + "/client/manifest.json", "utf-8")
-                    },
-                ]
+                type: "ok",
+                server: this.version,
+                protocol: PROTOCOL
             };
         }
+
+        this.log(1, peer, "Client updated from:", version, "(build: " + build + ")",
+            "to:", BUILD_INFO.version, "(build: " + BUILD_INFO.build + ")");
+
+        return {
+            type: "update",
+            version: BUILD_INFO.version,
+            build: BUILD_INFO.build,
+            files: [
+                {
+                    path: "main.js",
+                    data: fs.readFileSync(this.config.app_dir + "/client/main.js", "utf-8")
+                },
+                {
+                    path: "styles.css",
+                    data: fs.readFileSync(this.config.app_dir + "/client/styles.css", "utf-8")
+                },
+                {
+                    path: "manifest.json",
+                    data: fs.readFileSync(this.config.app_dir + "/client/manifest.json", "utf-8")
+                },
+            ]
+        };
     }
 
-    async checkFile(otherMetadata) {
-        const metadata = await XStorage.readMetadata(otherMetadata.path);
-
-        if (!metadata) {
-            return -1;
-        } else {
-            if (metadata.sha1 !== otherMetadata.sha1 || metadata.action !== otherMetadata.action) {
-                if (otherMetadata.mtime > metadata.mtime) {
-                    // request file upload
-                    return -1;
-                } else if (otherMetadata.mtime < metadata.mtime) {
-                    // request file download
-                    return 1;
-                }
-            }
-        }
-        return 0;
-    }
-
-    async onSync(data, packet) {
-        if(packet.peer.data.syncing) {
-            this.debug >= 1 && console.log("[SERVER][" + packet.peer.data.id + "] Sync already in progress...");
-            return;
-        }
-        this.debug >= 2 && console.log("[SERVER][" + packet.peer.data.id + "] Started sync");
-        packet.peer.data.syncing = true;
-        packet.peer.data.files = {};
-
-        if(!Array.isArray(data)) {
-            data = [];
-        }
-        data = data.filter((item) => {
-            if(item && item.metadata && Helpers.isSafePath(item.path)) {
-                return true;
-            }
-            console.warn("[SERVER][" + packet.peer.data.id + "] Rejected unsafe sync item:", item && item.path);
-            return false;
+    // a 1.6.0+ client says which device it is
+    onHello(info, peer) {
+        clearTimeout(peer._identifyTimeout);
+        info = info || {};
+        const { device, error } = this.devices.register({
+            id: info.id,
+            secret: info.secret,
+            name: info.name,
+            platform: info.platform
         });
+        if (error) {
+            this.log(1, peer, "Refused:", error);
+            setTimeout(() => peer.disconnect(error), 100);
+            return { protocol: PROTOCOL, error };
+        }
 
-        try {
-            this.debug >= 3 && console.log("[SYNC]", data);
-            const files = await XStorage.iterate();
-            const processedFiles = {};
+        peer.data.deviceId = device.id;
+        peer.data.name = device.name;
+        peer.data.autoSync = info.autoSync !== false;
+        if (!this.online.has(device.id)) {
+            this.online.set(device.id, new Set());
+        }
+        this.online.get(device.id).add(peer);
 
-            // SYNC server to client
-            for (let localFile of files) {
-                let foundItem = data.find((item) => item.path == localFile);
-                processedFiles[localFile] = 1;
+        peer.data.approved = device.status === Devices.STATUS.APPROVED;
+        this.log(1, peer, "Device", device.id, device.status + (device.approved_by && device.created === device.last_online ? " (" + device.approved_by + ")" : ""));
 
-                if (foundItem) {
-                    // if server & client have the item, compare it as a FileEvent
-                    foundItem.metadata.path = foundItem.path;
-                    packet.peer.data.files[foundItem.path] = await this.onFileEvent(foundItem.metadata, packet);
-                } else {
-                    let metadata = (await XStorage.readMetadata(localFile));
+        if (device.status === Devices.STATUS.PENDING) {
+            this.tellApproved({ type: "device_request", device: this.devices.public(device) });
+        }
+        if (device.status === Devices.STATUS.REVOKED) {
+            setTimeout(() => peer.disconnect("Device removed"), 100);
+        }
 
-                    // if only the server has the item
-                    packet.peer.data.files[localFile] = await this.onFileEvent({
-                        path: localFile,
-                        action: metadata.action,
-                        mtime: 0
-                    }, packet);
+        return {
+            protocol: PROTOCOL,
+            server: this.version,
+            features: FEATURES,
+            device: this.devices.public(device),
+            epoch: XStorage.epoch
+        };
+    }
+
+    // ---- devices ----
+
+    listDevices() {
+        return this.devices.list().map(device => Object.assign(device, {
+            online: this.online.has(device.id)
+        }));
+    }
+
+    approveDevice(id, by) {
+        const device = this.devices.approve(id, by || "server");
+        this.log(1, null, "Approved device:", device.name, "(" + device.id + ") by", by || "server");
+        for (const peer of this.online.get(device.id) || []) {
+            peer.data.approved = true;
+            peer.send({ type: "device_status", status: device.status }).catch(() => {});
+        }
+        this.tellApproved({ type: "devices_changed" });
+        return this.devices.public(device);
+    }
+
+    revokeDevice(id) {
+        const device = this.devices.revoke(id);
+        this.log(1, null, "Removed device:", device.name, "(" + device.id + ")");
+        this.disconnectDevice(device.id, "Device removed");
+        this.tellApproved({ type: "devices_changed" });
+        return this.devices.public(device);
+    }
+
+    removeDevice(id) {
+        const device = this.devices.remove(id);
+        this.log(1, null, "Declined device:", device.name, "(" + device.id + ")");
+        this.disconnectDevice(device.id, "Device declined");
+        this.tellApproved({ type: "devices_changed" });
+        return this.devices.public(device);
+    }
+
+    disconnectDevice(id, reason) {
+        for (const peer of this.online.get(id) || []) {
+            peer.data.approved = false;
+            peer.send({ type: "device_status", status: "revoked" }).catch(() => {}).finally(() => {
+                setTimeout(() => peer.disconnect(reason), 100);
+            });
+        }
+    }
+
+    tellApproved(message, except) {
+        for (const peers of this.online.values()) {
+            for (const peer of peers) {
+                if (peer !== except && peer.data.approved) {
+                    peer.send(message).catch(() => {});
                 }
             }
+        }
+    }
 
-            // SYNC client to server
-            for (let item of data) {
-                if (processedFiles[item.path]) {
+    // ---- changes ----
+
+    broadcastChanges(paths, origin) {
+        const entries = paths.map(p => [p, XStorage.index.get(p)]).filter(e => e[1]);
+        const message = { type: "changed", entries, epoch: XStorage.epoch };
+        for (const [deviceId, peers] of this.online) {
+            for (const peer of peers) {
+                // the device that made the change got the outcome in its reply
+                if (!peer.data.approved || (origin && deviceId === origin.id)) {
                     continue;
                 }
-
-                item.metadata.path = item.path;
-                packet.peer.data.files[item.path] = await this.onFileEvent(item.metadata, packet);
+                peer.send(message).catch(() => {});
             }
-            // filter null items
+        }
+    }
+
+    onMessage(packet) {
+        // everything in 1.6.0 goes over RPC; plain messages are 1.5.x clients that never updated
+        if (packet.msg == null || !packet.peer.isE2EEnabled()) {
+            return packet.peer.disconnect("Encryption required");
+        }
+        this.log(2, packet.peer, "Ignored message from an outdated client:", packet.msg && packet.msg.type);
+    }
+
+    // ---- server CLI, over a local socket ----
+
+    adminSocketPath() {
+        return module.exports.adminSocketPath(this.config);
+    }
+
+    async listenAdmin() {
+        const socketPath = this.adminSocketPath();
+        if (process.platform !== "win32" && fs.existsSync(socketPath)) {
+            fs.unlinkSync(socketPath);
+        }
+        this.admin = new AnySocket({ auth: { secret: this.config.password } });
+        this.admin.onAuth = () => true;
+        this.admin.rpc = {
+            devices: {
+                list: () => this.listDevices(),
+                approve: (id) => this.approveDevice(id, "server"),
+                revoke: (id) => this.revokeDevice(id),
+                remove: (id) => this.removeDevice(id)
+            }
+        };
+        this.admin.rpcGuard = (peer) => peer.isAuthenticated();
+        try {
+            await this.admin.listen("ipc", { path: socketPath });
         } catch (e) {
-            console.error("ERROR:", e);
-        }
-
-        for(let path in packet.peer.data.files) {
-            if(packet.peer.data.files[path] == null || packet.peer.data.files[path] == "server_newer") {
-                delete packet.peer.data.files[path];
-            }
-        }
-
-        await this.onSyncCompleted(packet.peer);
-    }
-
-    async onSyncCompleted(peer) {
-        if(peer.data.syncing == false)
-            return;
-
-        if (Object.keys(peer.data.files).length > 0) {
-            return;
-        }
-
-        this.debug >= 2 && console.log("[SERVER][" + peer.data.id + "] Sync completed");
-        peer.data.syncing = false;
-        peer.send({
-            type: "sync_complete"
-        }).catch(e => console.error("ERROR:", e));
-    }
-
-    async onFileEvent(data, packet) {
-        const metadata = await XStorage.readMetadata(data.path);
-        let fileResult = await this.checkFile(data);
-        this.debug >= 3 && console.log("[FileEvent]", data);
-        this.debug >= 3 && console.log("[CheckFileResult]", fileResult);
-
-        // request from client
-        if (fileResult == -1) {
-            if (data.action === "deleted") {
-                await XStorage.writeMetadata(data.path, data);
-                
-                for(let other of peerList) {
-                    if (other.id != packet.peer.id && other.data && other.data.autoSync) {
-                        other.send({
-                            type: "file_data",
-                            data: {
-                                type: "apply",
-                                path: data.path,
-                                metadata: data
-                            }
-                        }).catch(e => console.error("ERROR:", e));
-                    }
-                }
-                return "client_newer";
-            }
-
-            // For created/modified folders, just update the metadata
-            if(data.type === "folder") {
-                await XStorage.writeMetadata(data.path, data);
-                return "client_newer";
-            }
-
-            // For created/modified files, request the content
-            packet.peer.send({
-                type: "file_data",
-                data: {
-                    type: "send",
-                    path: data.path
-                }
-            }).catch(e => console.error("ERROR:", e));;
-            return "client_newer";
-        }
-
-        // send to client
-        else if (fileResult == 1) {
-            let isBinary = Helpers.isBinary(data.path);
-            packet.peer.send({
-                type: "file_data",
-                data: {
-                    type: "apply",
-                    binary: isBinary,
-                    path: data.path,
-                    metadata: metadata,
-                    data: isBinary ?
-                        AnySocket.Packer.pack(await XStorage.read(data.path, true)) :
-                        await XStorage.read(data.path)
-                }
-            }).catch(e => console.error("ERROR:", e));;
-            this.debug >= 2 && console.log("[SERVER][" + packet.peer.data.id + "] Updating client:", data.path);
-            return "server_newer";
-        }
-
-        return null;
-    }
-
-    async onFileData(data, packet) {
-        this.debug >= 3 && console.log("[FileData]", data);
-
-        if (data.type == "send") {
-            let isBinary = Helpers.isBinary(data.path);
-            packet.peer.send({
-                type: "file_data",
-                data: {
-                    type: "apply",
-                    binary: isBinary,
-                    data: isBinary ?
-                        AnySocket.Packer.pack(await XStorage.read(data.path, true)) :
-                        await XStorage.read(data.path),
-                    path: data.path,
-                    metadata: await XStorage.readMetadata(data.path)
-                }
-            }).catch(e => console.error("ERROR:", e));;
-        } else if (data.type == "apply") {
-            switch (data.metadata.action) {
-                case "created":
-                    await XStorage.writeMetadata(data.path, data.metadata);
-                    if (data.metadata.type == "file") {
-                        if(data.binary) {
-                            await XStorage.write(data.path, AnySocket.Packer.unpack(data.data) || null, true);
-                        }
-                        else {
-                            await XStorage.write(data.path, data.data || "");
-                        }
-                    }
-                    break
-                case "deleted":
-                    await XStorage.writeMetadata(data.path, data.metadata);
-                    break;
-            }
-
-            peerList.map(async (other) => {
-                try {
-                    if(data.type == "apply" && other.data.autoSync) {
-                        if (other.id != packet.peer.id) {
-                            other.send({
-                                type: "file_data",
-                                data: data
-                            }).catch(e => console.error("ERROR:", e));;
-                        }
-                    }
-                } catch (e) {
-                    console.log("broadcast error", e);
-                }
-            });
-
-            this.debug >= 2 && console.log("[SERVER][" + packet.peer.data.id + "] Updating server:", data.path);
-            if(packet.peer.data.syncing) {
-                delete packet.peer.data.files[data.path];
-                await this.onSyncCompleted(packet.peer);
-            }
+            console.error("[SERVER] Admin socket unavailable (" + socketPath + "):", e.message);
         }
     }
 
-    async onFileHistory(data, packet) {
-        this.debug >= 3 && console.log("[FileHistory]", data);
-        switch (data.type) {
-            case "list_versions":
-                let versionsMetadata = await XStorage.readMetadata(data.path);
-                if(!versionsMetadata) {
-                    // not on the server (yet)
-                    return packet.reply({
-                        deleted: false,
-                        data: []
-                    });
-                }
-                let versions = await XStorage.iterateVersions(data.path);
-                packet.reply({
-                    deleted: versionsMetadata.action == "deleted",
-                    data: versions.map(v => v.timestamp)
-                })
-                break;
-            case "list_files":
-                let files = [];
-                let items = await XStorage.iterate();
-                for(let item of items) {
-                    let metadata = await XStorage.readMetadata(item);
-                    if(metadata.type != "file") {
-                        continue;
-                    }
-
-                    let shouldAdd = false;
-                    if(data.mode != "deleted" && metadata.action != "deleted") {
-                        shouldAdd = true;
-                    }
-                    else if(data.mode == "deleted" && metadata.action == "deleted") {
-                        shouldAdd = true;
-                    }
-
-                    if(shouldAdd) {
-                        files.push({
-                            path: item,
-                            mtime: metadata.mtime
-                        });
-                    }
-                }
-                packet.reply(files);
-                break;
-            case "read":
-                if(!data.timestamp) {
-                    return packet.reply(await XStorage.read(data.path));
-                }
-                if(!/^\d+$/.test(String(data.timestamp))) {
-                    return packet.reply(null);
-                }
-                if(data.binary) {
-                    packet.reply(
-                        AnySocket.Packer.pack(await XStorage.readExact(data.path + "/" + data.timestamp, true))
-                    );
-                }
-                else {
-                    packet.reply(await XStorage.readExact(data.path + "/" + data.timestamp));
-                }
-                break;
-
-            default:
-                console.log("[FileHistory]", "type", data.type, "NOT IMPLEMENTED");
+    async stop() {
+        await this.server.stop().catch(() => {});
+        if (this.admin) {
+            await this.admin.stop().catch(() => {});
         }
     }
 }
+
+// where the server CLI finds the running server
+module.exports.adminSocketPath = (config) => {
+    if (process.platform === "win32") {
+        return "\\\\.\\pipe\\anysocket-sync-" + config.port;
+    }
+    const socketPath = path.join(config.data_path || path.join(config.app_dir, config.data_dir), "admin.sock");
+    // unix socket paths are limited to ~108 bytes
+    return socketPath.length < 100 ? socketPath : path.join(os.tmpdir(), "anysocket-sync-" + config.port + ".sock");
+};

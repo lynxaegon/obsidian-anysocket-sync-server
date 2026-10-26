@@ -1,5 +1,9 @@
 const fs = require("fs");
 
+/**
+ * data.json, kept readable by 1.5.x servers: `devices` stays as it was (by device name),
+ * everything 1.6.0 adds lives in new keys next to it.
+ */
 module.exports = class DB {
     constructor(root) {
         this.path = root + "/data.json";
@@ -9,16 +13,26 @@ module.exports = class DB {
             });
         }
 
+        this.data = null;
         if(fs.existsSync(this.path)) {
-            this.data = JSON.parse(fs.readFileSync(this.path, "utf8"));
+            try {
+                this.data = JSON.parse(fs.readFileSync(this.path, "utf8"));
+            } catch (e) {
+                // a 1.5.x server could leave it half-written; keep the broken copy for inspection
+                const broken = this.path + ".broken-" + Date.now();
+                fs.copyFileSync(this.path, broken);
+                console.error("[DB] data.json is corrupt, starting fresh. The old file was kept as:", broken);
+            }
         }
-        else {
-            this.data = {
-                devices: {}
-            };
-            this.save();
+        if(!this.data || typeof this.data !== "object") {
+            this.data = {};
         }
+        if(!this.data.devices || typeof this.data.devices !== "object") {
+            this.data.devices = {};
+        }
+        this.save();
 
+        // legacy device list (by name), used by 1.5.x servers
         this.devices = {
             add: (id) => {
                 if(!this.data.devices[id]) {
@@ -46,7 +60,10 @@ module.exports = class DB {
         }
     }
 
+    // written to a temp file and renamed over data.json, so a crash never corrupts it
     save() {
-        fs.writeFileSync(this.path, JSON.stringify(this.data), "utf8");
+        const tmp = this.path + ".tmp";
+        fs.writeFileSync(tmp, JSON.stringify(this.data), "utf8");
+        fs.renameSync(tmp, this.path);
     }
 }

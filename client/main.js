@@ -3380,10 +3380,13 @@ __export(main_exports, {
   default: () => AnySocketSyncPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian7 = require("obsidian");
+var import_obsidian10 = require("obsidian");
+
+// src/XSync.ts
+var import_obsidian6 = require("obsidian");
 
 // src/libs/AnysocketManager.ts
-var import_obsidian2 = require("obsidian");
+var import_obsidian = require("obsidian");
 
 // src/libs/Utils.ts
 var Utils_default = new class Utils {
@@ -3683,212 +3686,80 @@ var Utils_default = new class Utils {
     }
     return path.split(/[\\/]/).every((part) => part !== ".." && part !== ".");
   }
+  isSyncable(path) {
+    return this.isSafePath(path) && path.split("/").indexOf("metadata") === -1;
+  }
+  ago(time) {
+    if (!time) {
+      return "";
+    }
+    const s = Math.round((Date.now() - time) / 1e3);
+    if (s < 45)
+      return "just now";
+    if (s < 3600)
+      return Math.max(1, Math.round(s / 60)) + " min ago";
+    if (s < 86400)
+      return Math.round(s / 3600) + " h ago";
+    return new Date(time).toLocaleDateString(void 0, { month: "short", day: "numeric" });
+  }
+  randomId(bytes = 16) {
+    const data = new Uint8Array(bytes);
+    crypto.getRandomValues(data);
+    return Array.prototype.map.call(data, (x) => ("00" + x.toString(16)).slice(-2)).join("");
+  }
   isBinary(path) {
-    path = path.split(".");
-    let extension = path[path.length - 1];
-    return this.binaryExtensions.indexOf(extension) !== -1;
+    let parts = path.split(".");
+    if (parts.length < 2) {
+      return false;
+    }
+    if (!this._binarySet) {
+      this._binarySet = new Set(this.binaryExtensions.map((e) => e.toLowerCase()));
+    }
+    return this._binarySet.has(parts[parts.length - 1].toLowerCase());
   }
 }();
-
-// src/libs/XNotify.ts
-var import_obsidian = require("obsidian");
-var STATUS_OK = "#339933";
-var STATUS_SYNC = "#9900ff";
-var STATUS_WARN = "#ffaa00";
-var STATUS_ERROR = "#cc0000";
-var NotifyType = {
-  PLUGIN_DISABLED: "Disabled",
-  NOT_CONNECTED: "Not connected",
-  SYNCING: "Syncing...",
-  SYNC_COMPLETED: "Sync completed",
-  AUTO_SYNC_DISABLED: "Auto Sync disabled",
-  CONNECTION_LOST: "Connection lost",
-  CONNECTED: "Connected"
-};
-var XNotify = class {
-  constructor(xSync) {
-    this.statusBarItem = null;
-    this.statusBarIcon = null;
-    this.statusBarMessage = null;
-    this.timeoutStatusMessage = null;
-    this.mobileIndicator = null;
-    this.mobileIndicatorIcon = null;
-    this.current = null;
-    this.lastNotificationType = null;
-    this.pendingNotificationTimeout = null;
-    this.xSync = xSync;
-  }
-  makeStatusBarItem(statusbar) {
-    this.statusBarItem = statusbar;
-    let container = this.statusBarItem.createEl("span");
-    container.style.verticalAlign = "middle";
-    container.style.display = "inline-flex";
-    container.style.alignItems = "center";
-    this.statusBarIcon = container.createEl("span");
-    this.statusBarIcon.style.paddingRight = "4px";
-    this.statusBarIcon.style.color = STATUS_ERROR;
-    this.statusBarIcon.innerHTML = this.xSync.plugin.getSVGIcon();
-    this.statusBarMessage = container.createEl("span");
-    if (import_obsidian.Platform.isMobile) {
-      this.mobileIndicator = document.querySelector(".app-container").createEl("div");
-      this.mobileIndicator.addClass("anysocket-mobile-indicator");
-      this.mobileIndicatorIcon = this.mobileIndicator.createEl("span");
-      this.mobileIndicatorIcon.style.color = STATUS_ERROR;
-      this.mobileIndicatorIcon.innerHTML = this.xSync.plugin.getSVGIcon();
-    }
-  }
-  setStatusMessage(message, keep = false) {
-    if (!this.statusBarMessage)
-      return;
-    this.statusBarMessage.innerText = message;
-    clearTimeout(this.timeoutStatusMessage);
-    if (!keep) {
-      this.timeoutStatusMessage = setTimeout(() => {
-        this.statusBarMessage.innerText = "";
-      }, 2e3);
-    }
-  }
-  makeNotice(color, text) {
-    if (this.lastNotificationType == text && this.pendingNotificationTimeout != null)
-      return;
-    this.showNotification(color, text, 2e3);
-  }
-  showNotification(color, text, delay = 0) {
-    this.lastNotificationType = text;
-    clearTimeout(this.pendingNotificationTimeout);
-    this.pendingNotificationTimeout = setTimeout(() => {
-      let notice = new import_obsidian.Notice().noticeEl;
-      let container = notice.createEl("span");
-      container.style.verticalAlign = "middle";
-      container.style.display = "inline-flex";
-      container.style.alignItems = "center";
-      let icon = container.createEl("span");
-      icon.style.paddingRight = "4px";
-      icon.style.color = color;
-      icon.innerHTML = this.xSync.plugin.getSVGIcon();
-      container.createEl("span", { text });
-      this.pendingNotificationTimeout = null;
-    }, delay);
-  }
-  notifyStatus(type) {
-    const notifications = this.xSync.plugin.settings.notifications;
-    switch (type) {
-      case NotifyType.PLUGIN_DISABLED:
-        if (notifications > 0) {
-          this.makeNotice(STATUS_ERROR, NotifyType.PLUGIN_DISABLED);
-        }
-        if (this.statusBarIcon)
-          this.statusBarIcon.style.color = STATUS_ERROR;
-        if (this.mobileIndicatorIcon)
-          this.mobileIndicatorIcon.style.color = STATUS_ERROR;
-        this.setStatusMessage(NotifyType.PLUGIN_DISABLED, false);
-        break;
-      case NotifyType.CONNECTION_LOST:
-        if (notifications > 0) {
-          this.makeNotice(STATUS_ERROR, NotifyType.CONNECTION_LOST);
-        }
-        if (this.statusBarIcon)
-          this.statusBarIcon.style.color = STATUS_ERROR;
-        if (this.mobileIndicatorIcon)
-          this.mobileIndicatorIcon.style.color = STATUS_ERROR;
-        this.setStatusMessage(NotifyType.CONNECTION_LOST, false);
-        break;
-      case NotifyType.NOT_CONNECTED:
-        if (notifications > 0) {
-          this.makeNotice(STATUS_ERROR, NotifyType.NOT_CONNECTED);
-        }
-        if (this.statusBarIcon)
-          this.statusBarIcon.style.color = STATUS_ERROR;
-        if (this.mobileIndicatorIcon)
-          this.mobileIndicatorIcon.style.color = STATUS_ERROR;
-        this.setStatusMessage(NotifyType.NOT_CONNECTED, false);
-        break;
-      case NotifyType.CONNECTED:
-        if (notifications > 0) {
-          this.makeNotice(STATUS_OK, NotifyType.CONNECTED);
-        }
-        if (this.statusBarIcon)
-          this.statusBarIcon.style.color = STATUS_OK;
-        if (this.mobileIndicatorIcon)
-          this.mobileIndicatorIcon.style.color = STATUS_OK;
-        this.setStatusMessage(NotifyType.CONNECTED, false);
-        break;
-      case NotifyType.SYNCING:
-        if (notifications > 1) {
-          this.makeNotice(STATUS_SYNC, NotifyType.SYNCING);
-        }
-        if (this.statusBarIcon)
-          this.statusBarIcon.style.color = STATUS_SYNC;
-        if (this.mobileIndicatorIcon)
-          this.mobileIndicatorIcon.style.color = STATUS_SYNC;
-        this.setStatusMessage(NotifyType.SYNCING, true);
-        break;
-      case NotifyType.SYNC_COMPLETED:
-        if (notifications > 1) {
-          this.makeNotice(STATUS_OK, NotifyType.SYNC_COMPLETED);
-        }
-        if (this.statusBarIcon)
-          this.statusBarIcon.style.color = STATUS_OK;
-        if (this.mobileIndicatorIcon)
-          this.mobileIndicatorIcon.style.color = STATUS_OK;
-        this.setStatusMessage(NotifyType.SYNC_COMPLETED, false);
-        break;
-      case NotifyType.AUTO_SYNC_DISABLED:
-        if (notifications > 1) {
-          this.makeNotice(STATUS_WARN, NotifyType.AUTO_SYNC_DISABLED);
-        }
-        if (this.statusBarIcon)
-          this.statusBarIcon.style.color = STATUS_WARN;
-        if (this.mobileIndicatorIcon)
-          this.mobileIndicatorIcon.style.color = STATUS_WARN;
-        this.setStatusMessage(NotifyType.AUTO_SYNC_DISABLED, false);
-        break;
-    }
-  }
-  cleanup() {
-    clearTimeout(this.timeoutStatusMessage);
-    if (this.pendingNotificationTimeout) {
-      clearTimeout(this.pendingNotificationTimeout);
-      this.pendingNotificationTimeout = null;
-    }
-    this.cancelPendingNotification();
-  }
-};
 
 // src/libs/AnysocketManager.ts
 var import_Events = __toESM(require_Events());
 var import_anysocket_browser = __toESM(require_anysocket_browser());
-var NOTICE_COLOR = "#ffaa00";
 var CONNECT_OPTIONS = {
   heartbeatInterval: 10 * 1e3,
-  heartbeatsMaxMissed: 5
+  heartbeatsMaxMissed: 5,
+  connectTimeout: 15 * 1e3
 };
+var BACKOFF = [1e3, 2e3, 5e3, 1e4, 3e4];
 var AnysocketManager = class extends import_Events.default {
   constructor(xSync) {
     super();
-    this.eventRefs = {};
     this.isBackground = false;
     this.isConnected = false;
     this.isUpdating = false;
-    this.notifiedOfConnectError = false;
+    this.isEnabled = false;
     this.peer = null;
+    this.attempts = 0;
+    this.refusals = 0;
+    this.lastFailure = null;
     this.xSync = xSync;
     this.plugin = xSync.plugin;
     this.anysocket = this.createAnySocket();
     console.log("AnySocket Sync (" + this.plugin.VERSION + ") - Enabled");
-    if (import_obsidian2.Platform.isMobile) {
-      document.addEventListener("visibilitychange", () => {
+    if (import_obsidian.Platform.isMobile) {
+      this.onVisibility = () => {
         this.isBackground = document.hidden;
-        if (this.isBackground) {
-          this.emit("unload");
-        } else {
-          this.emit("reload");
+        if (!this.isBackground) {
+          this.attempts = 0;
         }
-      });
+        this.xSync.onBackground(this.isBackground);
+      };
+      document.addEventListener("visibilitychange", this.onVisibility);
     }
   }
-  async getTime() {
-    return Date.now();
+  destroy() {
+    if (this.onVisibility) {
+      document.removeEventListener("visibilitychange", this.onVisibility);
+    }
+    this.removeAllListeners();
+    this.stop();
   }
   createAnySocket() {
     return new import_anysocket_browser.default({
@@ -3898,11 +3769,18 @@ var AnysocketManager = class extends import_Events.default {
       }
     });
   }
+  async getTime() {
+    return Date.now();
+  }
+  nextDelay() {
+    return BACKOFF[Math.min(this.attempts, BACKOFF.length - 1)];
+  }
   async init() {
     this.anysocket.removeAllListeners();
     this.anysocket.stop().catch(() => {
     });
     this.anysocket = this.createAnySocket();
+    this.getTime = async () => Date.now();
     if (this.isBackground)
       return;
     let password = await Utils_default.getSHA(this.anysocket.id.substring(0, 16) + this.plugin.settings.password + this.anysocket.id.substring(16));
@@ -3934,10 +3812,11 @@ var AnysocketManager = class extends import_Events.default {
         }
       });
     });
-    this.anysocket.on("disconnected", (peer) => {
+    this.anysocket.on("disconnected", (peer, reason) => {
+      const wasConnected = this.isConnected;
       this.isConnected = false;
       this.peer = null;
-      this.emit("disconnected");
+      this.emit("disconnected", reason, wasConnected);
       this.emit("reload");
     });
     this.connect();
@@ -3949,55 +3828,71 @@ var AnysocketManager = class extends import_Events.default {
       this.peer = peer;
       this.isConnected = true;
       this.isUpdating = false;
-      this.emit("connected", peer);
+      this.attempts = 0;
+      this.refusals = 0;
+      this.lastFailure = null;
+      this.emit("ready", peer, result);
     } else if (result.type == "update") {
       this.isUpdating = true;
+      this.xSync.status.set("updating");
       await this.xSync.storage.updatePlugin(result.files);
       this.anysocket.removeAllListeners("disconnected");
       this.anysocket.stop().catch(() => {
       });
+      const downgrade = this.plugin.BUILD >= result.build;
+      window.localStorage.setItem("anysocket-sync-updated", JSON.stringify({
+        from: this.plugin.VERSION,
+        to: result.version,
+        downgrade
+      }));
       app.plugins.disablePlugin("anysocket-sync");
-      if (this.plugin.BUILD >= result.build) {
-        this.xSync.xNotify.showNotification(NOTICE_COLOR, "Your version is ahead of the server. Downgraded fom " + this.plugin.VERSION + " to " + result.version);
-      } else {
-        this.xSync.xNotify.showNotification(NOTICE_COLOR, "Updated to version: " + result.version);
-      }
+      this.xSync.status.notify(downgrade ? "your server runs an older version, switched from " + this.plugin.VERSION + " to " + result.version : "updated to version " + result.version);
       app.plugins.enablePlugin("anysocket-sync");
     } else {
       this.anysocket.removeAllListeners();
       this.emit("unload");
-      this.xSync.xNotify.showNotification(NOTICE_COLOR, "Incompatible client version " + this.plugin.VERSION);
+      this.xSync.status.set("error", { message: "this plugin version (" + this.plugin.VERSION + ") doesn't work with the server" });
     }
   }
   connect() {
     if (!this.isEnabled) {
       return;
     }
-    if (!this.plugin.settings.password) {
+    if (!this.plugin.settings.password || !this.plugin.settings.host) {
       console.log("AnySocket Sync - Requires setup");
-      this.xSync.xNotify.showNotification(NOTICE_COLOR, "AnySocket Sync - Requires setup");
+      this.xSync.status.set("setup");
       this.emit("unload");
       return;
     }
+    this.xSync.status.set("connecting");
     this.anysocket.connect("ws", this.plugin.settings.host, this.plugin.settings.port, CONNECT_OPTIONS).then(async (peer) => {
-      this.notifiedOfConnectError = false;
       Promise.resolve(peer.e2e()).catch((e) => {
         console.error("AnySocket Sync - Encryption failed", e);
         peer.disconnect("e2e failed");
       });
     }).catch((e) => {
-      try {
-        console.error("AnySocket Connect Error", e);
-        if (!this.notifiedOfConnectError && !this.isUpdating) {
-          this.notifiedOfConnectError = true;
-          this.xSync.xNotify.notifyStatus(NotifyType.NOT_CONNECTED);
-        }
-      } catch (e2) {
-        console.log("Error", e2);
-      }
+      console.error("AnySocket Sync - Connect error", e);
+      this.attempts++;
       this.isConnected = false;
+      if (!this.isUpdating) {
+        this.refusals = AnysocketManager.classify(e) === "auth_failed" ? this.refusals + 1 : 0;
+        this.lastFailure = this.refusals >= 2 ? "auth_failed" : "unreachable";
+        this.emit("failed", this.lastFailure);
+      }
       this.emit("reload");
     });
+  }
+  static classify(e) {
+    if (e && e.code === "ECONNFAILED") {
+      return "auth_failed";
+    }
+    return "unreachable";
+  }
+  request(packet) {
+    if (!this.peer) {
+      return Promise.reject(new Error("Not connected"));
+    }
+    return this.peer.send(packet, true).then((reply) => reply.msg);
   }
   async send(packet, onReply) {
     if (!this.peer)
@@ -4007,7 +3902,7 @@ var AnysocketManager = class extends import_Events.default {
         packet = await this.peer.send(packet, true);
       } catch (e) {
         console.error("AnySocket Sync - No reply from server", e);
-        this.xSync.xNotify.showNotification(NOTICE_COLOR, "The server did not respond, try again");
+        this.xSync.status.notify("the server did not respond, try again");
         return;
       }
       onReply(packet);
@@ -4022,13 +3917,13 @@ var AnysocketManager = class extends import_Events.default {
 };
 
 // src/libs/fs/FSAdapter.ts
-var import_obsidian3 = require("obsidian");
+var import_obsidian2 = require("obsidian");
 var FSAdapter = class {
   constructor(basePath) {
     this.basePath = basePath;
   }
   async makeFolder(path) {
-    await app.vault.createFolder((0, import_obsidian3.normalizePath)(this.basePath + path)).catch(() => {
+    await app.vault.createFolder((0, import_obsidian2.normalizePath)(this.basePath + path)).catch(() => {
     });
   }
   async write(path, data, mtime, binary = false) {
@@ -4046,9 +3941,9 @@ var FSAdapter = class {
         };
       }
       if (binary) {
-        await app.vault.adapter.writeBinary((0, import_obsidian3.normalizePath)(this.basePath + path), data, options);
+        await app.vault.adapter.writeBinary((0, import_obsidian2.normalizePath)(this.basePath + path), data, options);
       } else {
-        await app.vault.adapter.write((0, import_obsidian3.normalizePath)(this.basePath + path), data, options);
+        await app.vault.adapter.write((0, import_obsidian2.normalizePath)(this.basePath + path), data, options);
       }
     }
     return data;
@@ -4056,21 +3951,21 @@ var FSAdapter = class {
   async read(path, binary = false) {
     try {
       if (binary) {
-        return await app.vault.adapter.readBinary((0, import_obsidian3.normalizePath)(this.basePath + path));
+        return await app.vault.adapter.readBinary((0, import_obsidian2.normalizePath)(this.basePath + path));
       }
-      return await app.vault.adapter.read((0, import_obsidian3.normalizePath)(this.basePath + path));
+      return await app.vault.adapter.read((0, import_obsidian2.normalizePath)(this.basePath + path));
     } catch (e) {
       return null;
     }
   }
   async exists(path) {
-    return await app.vault.adapter.exists((0, import_obsidian3.normalizePath)(this.basePath + path));
+    return await app.vault.adapter.exists((0, import_obsidian2.normalizePath)(this.basePath + path));
   }
   async delete(path) {
     await app.fileManager.trashFile(this.getFile(path));
   }
   async forceDelete(path) {
-    return await app.vault.adapter.remove((0, import_obsidian3.normalizePath)(this.basePath + path));
+    return await app.vault.adapter.remove((0, import_obsidian2.normalizePath)(this.basePath + path));
   }
   async iterate(callback) {
     let files = app.vault.getAllLoadedFiles();
@@ -4079,12 +3974,12 @@ var FSAdapter = class {
     }
   }
   getFile(path) {
-    return app.vault.getAbstractFileByPath((0, import_obsidian3.normalizePath)(path));
+    return app.vault.getAbstractFileByPath((0, import_obsidian2.normalizePath)(path));
   }
 };
 
 // src/libs/fs/Storage.ts
-var import_obsidian4 = require("obsidian");
+var import_obsidian3 = require("obsidian");
 var Storage = class {
   constructor(plugin, getTime) {
     this.inited = false;
@@ -4092,7 +3987,7 @@ var Storage = class {
     this.metadataFile = "metadata.json";
     this.throttledWriteTimeout = null;
     this.lastWriteTime = 0;
-    this.fsVault = new FSAdapter((0, import_obsidian4.normalizePath)("/"));
+    this.fsVault = new FSAdapter((0, import_obsidian3.normalizePath)("/"));
     this.fsInternal = new FSAdapter(plugin.manifest.dir + "/");
     this.getTime = getTime || (async () => Date.now());
   }
@@ -4275,81 +4170,1243 @@ var Storage = class {
 Storage.tree = null;
 
 // src/XSync.ts
-var import_anysocket_browser2 = __toESM(require_anysocket_browser());
 var import_XTimeouts = __toESM(require_XTimeouts());
-var XSync = class {
+
+// src/libs/Status.ts
+var import_obsidian4 = require("obsidian");
+var import_Events2 = __toESM(require_Events());
+var LOOK = {
+  disabled: { icon: "cloud-off", tone: "muted" },
+  setup: { icon: "settings", tone: "warn" },
+  connecting: { icon: "refresh-cw", tone: "busy", spin: true },
+  offline: { icon: "cloud-off", tone: "error" },
+  unreachable: { icon: "cloud-off", tone: "error" },
+  auth_failed: { icon: "key", tone: "error" },
+  updating: { icon: "download", tone: "busy", spin: false },
+  waiting_approval: { icon: "lock", tone: "warn" },
+  revoked: { icon: "ban", tone: "error" },
+  syncing: { icon: "refresh-cw", tone: "busy", spin: true },
+  synced: { icon: "check", tone: "ok" },
+  paused: { icon: "pause", tone: "warn" },
+  error: { icon: "alert-triangle", tone: "error" }
+};
+var NOTIFY = { OFF: 0, IMPORTANT: 1, EVERYTHING: 2 };
+var Status = class extends import_Events2.default {
   constructor(plugin) {
-    this.isEnabled = false;
-    this.eventRefs = {};
-    this.reloadTimeout = null;
-    this.deleteQueue = {};
-    this.isProcessingDeleteQueue = false;
+    super();
+    this.state = "disabled";
+    this.info = {};
+    this.lastSync = 0;
+    this.pending = 0;
+    this.attention = 0;
+    this.statusBarEl = null;
+    this.iconEl = null;
+    this.textEl = null;
+    this.mobileEl = null;
+    this.tick = null;
+    this.recentNotices = /* @__PURE__ */ new Map();
     this.plugin = plugin;
-    this.unsentSessionEvents = {};
-    this.anysocket = new AnysocketManager(this);
-    this.storage = new Storage(plugin);
-    this.xTimeouts = new import_XTimeouts.default();
-    this.xNotify = new XNotify(this);
   }
-  async enabled(value) {
-    if (this.isEnabled !== value) {
-      this.isEnabled = value;
-      if (this.isEnabled) {
-        await this.load();
-      } else {
-        this.unload();
+  mount(statusBarEl, onClick) {
+    this.statusBarEl = statusBarEl;
+    statusBarEl.addClass("anysocket-status", "mod-clickable");
+    statusBarEl.addEventListener("click", onClick);
+    this.iconEl = statusBarEl.createSpan({ cls: "anysocket-status-icon" });
+    this.textEl = statusBarEl.createSpan({ cls: "anysocket-status-text" });
+    if (import_obsidian4.Platform.isMobile) {
+      const container = document.querySelector(".app-container") || document.body;
+      this.mobileEl = container.createDiv({ cls: "anysocket-mobile-indicator" });
+      this.mobileEl.addEventListener("click", onClick);
+    }
+    this.tick = window.setInterval(() => this.render(), 30 * 1e3);
+    this.render();
+  }
+  unmount() {
+    window.clearInterval(this.tick);
+    if (this.mobileEl) {
+      this.mobileEl.remove();
+      this.mobileEl = null;
+    }
+  }
+  set(state, info = {}) {
+    const previous = this.state;
+    this.state = state;
+    this.info = info;
+    if (state === "synced") {
+      this.lastSync = info.at || Date.now();
+    }
+    if (info.pending !== void 0) {
+      this.pending = info.pending;
+    }
+    this.render();
+    this.emit("change", state, previous);
+  }
+  pendingChanged(count) {
+    this.pending = count;
+    this.render();
+    this.emit("change", this.state, this.state);
+  }
+  attentionChanged(count) {
+    if (count !== this.attention) {
+      this.attention = count;
+      this.render();
+      this.emit("change", this.state, this.state);
+    }
+  }
+  shortText() {
+    const info = this.info || {};
+    switch (this.state) {
+      case "disabled":
+        return "Sync off";
+      case "setup":
+        return "Set up sync";
+      case "connecting":
+        return "Connecting\u2026";
+      case "offline":
+      case "unreachable":
+        return this.pending > 0 ? "Offline \xB7 " + this.pending + " waiting" : "Offline";
+      case "auth_failed":
+        return "Wrong password";
+      case "updating":
+        return "Updating plugin\u2026";
+      case "waiting_approval":
+        return "Waiting for approval";
+      case "revoked":
+        return "Device removed";
+      case "syncing":
+        return info.total > 1 ? "Syncing " + Math.min(info.done, info.total) + "/" + info.total : "Syncing\u2026";
+      case "synced": {
+        const ago = Date.now() - this.lastSync > 60 * 1e3 ? " " + Utils_default.ago(this.lastSync) : "";
+        return "Synced" + ago;
+      }
+      case "paused":
+        return this.pending > 0 ? "Auto sync off \xB7 " + this.pending + " waiting" : "Auto sync off";
+      case "error":
+        return "Sync problem";
+    }
+    return "";
+  }
+  sentence() {
+    const s = this.plugin.settings;
+    const info = this.info || {};
+    switch (this.state) {
+      case "disabled":
+        return 'Sync is turned off. Turn on "Enable connection" in the settings to start.';
+      case "setup":
+        return "Enter your server's address and password in the settings to start syncing.";
+      case "connecting":
+        return "Connecting to " + s.host + ":" + s.port + "\u2026";
+      case "offline":
+        return "Connection lost. Your changes are kept and will sync when it's back.";
+      case "unreachable":
+        return "Can't reach the server at " + s.host + ":" + s.port + ". Your changes are kept and will sync when it's back.";
+      case "auth_failed":
+        return "The server didn't accept the password. Check it in the settings.";
+      case "updating":
+        return "Installing the server's version of the plugin\u2026";
+      case "waiting_approval":
+        return "This device needs to be approved before it can sync. Approve it from a device that already syncs (AnySocket Sync \u2192 Devices), or on the server.";
+      case "revoked":
+        return "This device was removed from sync. Approve it again on the server or from another device to sync again.";
+      case "syncing":
+        return info.total > 1 ? "Syncing " + Math.min(info.done, info.total) + " of " + info.total + " changes\u2026" : "Syncing\u2026";
+      case "synced":
+        return "Everything is up to date" + (this.lastSync ? " (last synced " + Utils_default.ago(this.lastSync) + ")" : "") + ".";
+      case "paused":
+        return 'Auto sync is off. Use "Sync now" to sync' + (this.pending > 0 ? " your " + this.pending + " waiting changes" : "") + ".";
+      case "error":
+        return "Something went wrong while syncing: " + (info.message || "unknown error") + ". It will try again.";
+    }
+    return "";
+  }
+  render() {
+    const look = LOOK[this.state] || LOOK.disabled;
+    const tone = this.attention > 0 && look.tone === "ok" ? "warn" : look.tone;
+    let text = this.shortText();
+    if (this.attention > 0) {
+      text += " \xB7 " + this.attention + " to review";
+    }
+    const tooltip = this.sentence() + (this.attention > 0 ? "\n" + this.attention + " file(s) were changed on two devices; both versions were kept. Click to review." : "");
+    for (const el of [this.statusBarEl, this.mobileEl]) {
+      if (!el)
+        continue;
+      el.setAttr("data-tone", tone);
+      el.setAttr("aria-label", tooltip);
+      el.toggleClass("is-spinning", !!look.spin);
+    }
+    if (this.iconEl) {
+      (0, import_obsidian4.setIcon)(this.iconEl, look.icon);
+      this.textEl.setText(text);
+    }
+    if (this.mobileEl) {
+      (0, import_obsidian4.setIcon)(this.mobileEl, look.icon);
+    }
+  }
+  notify(message, level = NOTIFY.IMPORTANT, duration) {
+    const setting = this.plugin.settings.notifications;
+    if (setting < level || setting === NOTIFY.OFF) {
+      return null;
+    }
+    const last = this.recentNotices.get(message) || 0;
+    if (Date.now() - last < 60 * 1e3) {
+      return null;
+    }
+    this.recentNotices.set(message, Date.now());
+    return new import_obsidian4.Notice("AnySocket Sync: " + message, duration);
+  }
+  ask(message, actions, duration = 0) {
+    if (this.plugin.settings.notifications === NOTIFY.OFF) {
+      return null;
+    }
+    const notice = new import_obsidian4.Notice("", duration);
+    const el = notice.noticeEl;
+    el.addClass("anysocket-notice");
+    el.createDiv({ text: message, cls: "anysocket-notice-text" });
+    const row = el.createDiv({ cls: "anysocket-notice-actions" });
+    for (const action of actions) {
+      const button = row.createEl("button", { text: action.label, cls: action.cta ? "mod-cta" : "" });
+      button.addEventListener("click", (e) => {
+        e.stopPropagation();
+        notice.hide();
+        action.run();
+      });
+    }
+    return notice;
+  }
+};
+
+// src/libs/Activity.ts
+var import_Events3 = __toESM(require_Events());
+var LIMIT = 50;
+var Activity = class extends import_Events3.default {
+  constructor() {
+    super(...arguments);
+    this.items = [];
+  }
+  add(type, path, extra) {
+    this.items.unshift({ type, path, extra, at: Date.now() });
+    if (this.items.length > LIMIT) {
+      this.items.length = LIMIT;
+    }
+    this.emit("change");
+  }
+  clear() {
+    this.items = [];
+    this.emit("change");
+  }
+  static describe(item) {
+    const name = item.path.split("/").pop();
+    switch (item.type) {
+      case "downloaded":
+        return { icon: "arrow-down", text: "Got " + name };
+      case "uploaded":
+        return { icon: "arrow-up", text: "Sent " + name };
+      case "deleted":
+        return { icon: "trash-2", text: "Deleted " + name };
+      case "deleted_remote":
+        return { icon: "trash-2", text: "Deleted " + name + " everywhere" };
+      case "renamed":
+        return { icon: "pencil", text: "Renamed " + (item.extra ? item.extra.split("/").pop() + " \u2192 " : "") + name };
+      case "merged":
+        return { icon: "git-merge", text: "Combined changes from two devices in " + name };
+      case "kept_both":
+        return { icon: "copy", text: name + " changed on two devices, both versions kept" };
+      case "restored":
+        return { icon: "undo-2", text: "Kept " + name + ": it was changed on another device" };
+      case "failed":
+        return { icon: "alert-triangle", text: "Couldn't sync " + name + (item.extra ? " (" + item.extra + ")" : "") };
+    }
+    return { icon: "dot", text: item.type + " " + name };
+  }
+};
+
+// src/sync/SyncV2.ts
+var import_obsidian5 = require("obsidian");
+
+// src/sync/LocalIndex.ts
+var FILE = "index-v2.json";
+function sameState(a, b) {
+  return !!a && !!b && a.action === b.action && (a.action === "deleted" || a.type === "folder" || b.type === "folder" || a.sha1 === b.sha1);
+}
+function isDirty(entry) {
+  if (!entry) {
+    return false;
+  }
+  if (!entry.synced) {
+    return entry.action === "created";
+  }
+  return !sameState({ type: entry.type, action: entry.action, sha1: entry.sha1 }, Object.assign({ type: entry.type }, entry.synced));
+}
+var LocalIndex = class {
+  constructor(fsInternal) {
+    this.entries = {};
+    this.epoch = null;
+    this.cursor = null;
+    this.loaded = false;
+    this.existed = false;
+    this.saveTimeout = null;
+    this.fs = fsInternal;
+  }
+  async load() {
+    if (this.loaded) {
+      return this.existed;
+    }
+    this.loaded = true;
+    try {
+      const raw = await this.fs.read(FILE);
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data && data.version === 2 && data.entries) {
+          this.entries = data.entries;
+          this.epoch = data.epoch || null;
+          this.cursor = typeof data.cursor === "number" ? data.cursor : null;
+          this.existed = true;
+          return true;
+        }
+      }
+    } catch (e) {
+      console.error("AnySocket Sync - index unreadable, rebuilding it", e);
+    }
+    this.entries = {};
+    this.epoch = null;
+    this.cursor = null;
+    return false;
+  }
+  get(path) {
+    return this.entries[path] || null;
+  }
+  set(path, entry) {
+    this.entries[path] = entry;
+    this.scheduleSave();
+  }
+  remove(path) {
+    delete this.entries[path];
+    this.scheduleSave();
+  }
+  paths() {
+    return Object.keys(this.entries);
+  }
+  dirtyPaths() {
+    return this.paths().filter((path) => isDirty(this.entries[path]));
+  }
+  setCursor(epoch, cursor) {
+    this.epoch = epoch;
+    this.cursor = cursor;
+    this.scheduleSave();
+  }
+  resetCursor() {
+    this.setCursor(null, null);
+  }
+  scheduleSave() {
+    if (this.saveTimeout) {
+      return;
+    }
+    this.saveTimeout = setTimeout(() => {
+      this.saveTimeout = null;
+      this.save();
+    }, 500);
+  }
+  async save() {
+    clearTimeout(this.saveTimeout);
+    this.saveTimeout = null;
+    try {
+      await this.fs.write(FILE, JSON.stringify({
+        version: 2,
+        epoch: this.epoch,
+        cursor: this.cursor,
+        entries: this.entries
+      }));
+    } catch (e) {
+      console.error("AnySocket Sync - could not save the index", e);
+    }
+  }
+  async drop() {
+    this.entries = {};
+    this.epoch = null;
+    this.cursor = null;
+    await this.fs.forceDelete(FILE).catch(() => {
+    });
+  }
+};
+
+// src/sync/SyncV2.ts
+var KEPT_COPY = /\(.+'s version, [A-Z][a-z]{2} \d{1,2}( \d+)?\)(\.[^./]+)?$/;
+var LARGE_TIMEOUT = 10 * 60 * 1e3;
+var textDecoder = new TextDecoder("utf-8", { ignoreBOM: true, fatal: true });
+var TEXT = /* @__PURE__ */ new Set(["md", "txt", "canvas", "json", "css", "csv", "svg", "html", "htm", "xml", "yaml", "yml", "js", "ts", "tex", "bib", "org", "base"]);
+var textEncoder = new TextEncoder();
+function toUint8(data) {
+  if (data == null) {
+    return null;
+  }
+  if (data instanceof Uint8Array) {
+    return data;
+  }
+  if (data instanceof ArrayBuffer) {
+    return new Uint8Array(data);
+  }
+  if (ArrayBuffer.isView(data)) {
+    return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+  }
+  if (typeof data === "string") {
+    return textEncoder.encode(data);
+  }
+  throw new Error("unexpected content");
+}
+function toArrayBuffer(bytes) {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+}
+var depth = (path) => path.split("/").length;
+var SyncV2 = class {
+  constructor(xSync) {
+    this.peer = null;
+    this.running = false;
+    this.queue = Promise.resolve();
+    this.syncing = false;
+    this.syncAgain = false;
+    this.expectedRenames = /* @__PURE__ */ new Set();
+    this.device = null;
+    this.features = [];
+    this.xSync = xSync;
+    this.index = new LocalIndex(xSync.storage.fsInternal);
+  }
+  get plugin() {
+    return this.xSync.plugin;
+  }
+  get storage() {
+    return this.xSync.storage;
+  }
+  get status() {
+    return this.xSync.status;
+  }
+  get activity() {
+    return this.xSync.activity;
+  }
+  rpc(timeout) {
+    if (!this.peer) {
+      throw new Error("Not connected");
+    }
+    return timeout ? this.peer.rpcWith({ timeout }) : this.peer.rpc;
+  }
+  enqueue(fn) {
+    const run = this.queue.then(() => this.running ? fn() : null);
+    this.queue = run.catch((e) => {
+      if (this.running) {
+        console.error("AnySocket Sync -", e);
+      }
+    });
+    return run;
+  }
+  async start(peer, hello) {
+    this.peer = peer;
+    this.device = hello.device;
+    this.features = hello.features || [];
+    this.running = true;
+    const existed = await this.index.load();
+    if (!existed && !this.importedLegacy) {
+      this.importedLegacy = true;
+      await this.importLegacyDeletes();
+    }
+    if (this.plugin.settings.autoSync) {
+      return this.syncNow();
+    }
+    await this.enqueue(() => this.scanLocal());
+    this.status.set("paused", { pending: this.index.dirtyPaths().length });
+  }
+  async stop() {
+    this.running = false;
+    this.peer = null;
+    await this.index.save();
+  }
+  async time() {
+    return await this.xSync.anysocket.getTime();
+  }
+  async clockOffset() {
+    return await this.time() - Date.now();
+  }
+  async hashFile(path) {
+    const data = await this.storage.readBinary(path);
+    if (data == null) {
+      return null;
+    }
+    return { data: new Uint8Array(data), sha1: await Utils_default.getSHABinary(new Uint8Array(data)) };
+  }
+  async scanLocal() {
+    const offset = await this.clockOffset();
+    const seen = /* @__PURE__ */ new Set();
+    for (const file of app.vault.getAllLoadedFiles()) {
+      if (file.path === "/" || !Utils_default.isSyncable(file.path)) {
+        continue;
+      }
+      seen.add(file.path);
+      const entry = this.index.get(file.path);
+      if (file instanceof import_obsidian5.TFolder || !file.stat) {
+        if (!entry || entry.action !== "created" || entry.type !== "folder") {
+          this.index.set(file.path, {
+            type: "folder",
+            action: "created",
+            sha1: null,
+            lmtime: 0,
+            mtime: entry && entry.mtime || Date.now() + offset,
+            synced: entry ? entry.synced : null
+          });
+        }
+        continue;
+      }
+      if (entry && entry.type === "file" && entry.action === "created" && entry.lmtime === file.stat.mtime) {
+        continue;
+      }
+      const hashed = await this.hashFile(file.path);
+      if (!hashed) {
+        continue;
+      }
+      this.index.set(file.path, {
+        type: "file",
+        action: "created",
+        sha1: hashed.sha1,
+        lmtime: file.stat.mtime,
+        mtime: file.stat.mtime + offset,
+        synced: entry ? entry.synced : null,
+        from: entry ? entry.from : void 0
+      });
+    }
+    const now = Date.now() + offset;
+    for (const path of this.index.paths()) {
+      const entry = this.index.get(path);
+      if (seen.has(path) || entry.action === "deleted") {
+        continue;
+      }
+      if (!entry.synced) {
+        this.index.remove(path);
+        continue;
+      }
+      entry.action = "deleted";
+      entry.mtime = now;
+      this.index.set(path, entry);
+    }
+  }
+  async importLegacyDeletes() {
+    const queue = await this.storage.loadDeleteQueue();
+    for (const path in queue) {
+      const item = queue[path];
+      if (!item || !item.metadata || !Utils_default.isSyncable(path) || app.vault.getAbstractFileByPath(path)) {
+        continue;
+      }
+      this.index.set(path, {
+        type: item.metadata.type === "folder" ? "folder" : "file",
+        action: "deleted",
+        sha1: item.metadata.sha1 || null,
+        lmtime: 0,
+        mtime: item.metadata.mtime || Date.now(),
+        synced: { sha1: item.metadata.sha1 || null, action: "created" }
+      });
+    }
+  }
+  syncNow(full = false) {
+    if (this.syncing) {
+      this.syncAgain = true;
+      return this.queue;
+    }
+    return this.enqueue(async () => {
+      this.syncing = true;
+      try {
+        do {
+          this.syncAgain = false;
+          await this.runSync(full);
+          full = false;
+        } while (this.syncAgain && this.running);
+      } catch (e) {
+        if (this.running && this.peer) {
+          console.error("AnySocket Sync - sync failed", e);
+          this.status.set("error", { message: e && (e.message || e.error) || String(e) });
+        }
+      } finally {
+        this.syncing = false;
+      }
+    });
+  }
+  async runSync(full) {
+    this.status.set("syncing", { done: 0, total: 0 });
+    await this.scanLocal();
+    if (full) {
+      this.index.resetCursor();
+    }
+    const list = await this.rpc(LARGE_TIMEOUT).sync.list(this.index.cursor === null ? false : this.index.cursor, this.index.epoch || false);
+    const remote = new Map(list.entries);
+    if (list.full) {
+      for (const path of this.index.paths()) {
+        const entry = this.index.get(path);
+        if (entry.synced && !remote.has(path)) {
+          entry.synced = null;
+          this.index.set(path, entry);
+        }
       }
     }
+    const toApply = [];
+    for (const [path, meta] of remote) {
+      if (!Utils_default.isSyncable(path)) {
+        continue;
+      }
+      const entry = this.index.get(path);
+      if (entry && sameState(entry, meta)) {
+        entry.synced = { sha1: meta.sha1 || null, action: meta.action, seq: meta.seq };
+        this.index.set(path, entry);
+        continue;
+      }
+      if (entry && isDirty(entry)) {
+        continue;
+      }
+      toApply.push([path, meta]);
+    }
+    const dirty = this.index.dirtyPaths();
+    const total = toApply.length + dirty.length;
+    let done = 0;
+    const progress = () => this.status.set("syncing", { done: ++done, total });
+    await this.applyRemote(toApply, progress);
+    await this.pushAll(progress);
+    this.index.setCursor(list.epoch, list.cursor);
+    await this.index.save();
+    this.status.set("synced", { at: Date.now() });
   }
-  connectionOK() {
-    if (!this.isEnabled) {
-      this.xNotify.notifyStatus(NotifyType.PLUGIN_DISABLED);
+  async safely(path, fn) {
+    try {
+      await fn();
+    } catch (e) {
+      if (!this.running || !this.peer) {
+        throw e;
+      }
+      console.error("AnySocket Sync - " + path, e);
+      this.activity.add("failed", path, e && (e.message || e.error) || String(e));
+    }
+  }
+  async applyRemote(entries, progress = () => {
+  }) {
+    const renamedTo = /* @__PURE__ */ new Map();
+    for (const [path, meta] of entries) {
+      if (meta.action === "deleted" && meta.renamed_to) {
+        renamedTo.set(meta.renamed_to, path);
+      }
+    }
+    const creates = entries.filter((e) => e[1].action !== "deleted").sort((a, b) => depth(a[0]) - depth(b[0]));
+    const deletes = entries.filter((e) => e[1].action === "deleted").sort((a, b) => depth(b[0]) - depth(a[0]));
+    for (const [path, meta] of creates) {
+      if (!this.running)
+        return;
+      await this.safely(path, () => this.applyCreated(path, meta, renamedTo.get(path)));
+      progress();
+    }
+    for (const [path, meta] of deletes) {
+      if (!this.running)
+        return;
+      await this.safely(path, () => this.applyDeleted(path, meta));
+      progress();
+    }
+  }
+  synced(meta) {
+    return { sha1: meta.sha1 || null, action: meta.action, seq: meta.seq };
+  }
+  async localUnchanged(path) {
+    const local = app.vault.getAbstractFileByPath(path);
+    if (!local) {
+      return true;
+    }
+    const entry = this.index.get(path);
+    if (!entry || isDirty(entry) || entry.action !== "created") {
       return false;
     }
-    if (!this.anysocket.isConnected) {
-      this.xNotify.notifyStatus(NotifyType.NOT_CONNECTED);
+    if (!(local instanceof import_obsidian5.TFile)) {
+      return entry.type === "folder";
+    }
+    const hashed = await this.hashFile(path);
+    return !!hashed && hashed.sha1 === entry.sha1;
+  }
+  async keepLocal(path) {
+    const local = app.vault.getAbstractFileByPath(path);
+    const entry = this.index.get(path);
+    if (local instanceof import_obsidian5.TFile) {
+      const hashed = await this.hashFile(path);
+      this.index.set(path, {
+        type: "file",
+        action: "created",
+        sha1: hashed ? hashed.sha1 : null,
+        lmtime: local.stat.mtime,
+        mtime: local.stat.mtime + await this.clockOffset(),
+        synced: entry ? entry.synced : null
+      });
+    }
+    this.schedulePush(path, 0);
+  }
+  async applyCreated(path, meta, renamedFrom) {
+    const local = app.vault.getAbstractFileByPath(path);
+    if (meta.type === "folder") {
+      if (!local && renamedFrom && await this.renameLocal(renamedFrom, path, meta)) {
+        return;
+      }
+      const existing = this.index.get(path);
+      this.index.set(path, {
+        type: "folder",
+        action: "created",
+        sha1: null,
+        lmtime: 0,
+        mtime: meta.mtime,
+        synced: this.synced(meta)
+      });
+      if (!local) {
+        await this.storage.fsVault.makeFolder(path);
+      }
+      return;
+    }
+    if (!local && renamedFrom && await this.renameLocal(renamedFrom, path, meta)) {
+      return;
+    }
+    if (local instanceof import_obsidian5.TFile) {
+      const hashed = await this.hashFile(path);
+      if (hashed && hashed.sha1 === meta.sha1) {
+        this.index.set(path, {
+          type: "file",
+          action: "created",
+          sha1: meta.sha1,
+          lmtime: local.stat.mtime,
+          mtime: meta.mtime,
+          synced: this.synced(meta)
+        });
+        return;
+      }
+    }
+    if (!await this.localUnchanged(path)) {
+      return this.keepLocal(path);
+    }
+    await this.download(path, meta);
+    this.activity.add("downloaded", path);
+  }
+  async download(path, meta) {
+    const bytes = toUint8(await this.rpc(LARGE_TIMEOUT).sync.content(path, false));
+    if (bytes == null) {
+      return;
+    }
+    const sha1 = await Utils_default.getSHABinary(bytes);
+    this.index.set(path, {
+      type: "file",
+      action: "created",
+      sha1,
+      lmtime: 0,
+      mtime: meta.mtime,
+      synced: { sha1, action: "created", seq: meta.seq }
+    });
+    await this.writeLocal(path, bytes, meta.mtime);
+    const file = app.vault.getAbstractFileByPath(path);
+    const entry = this.index.get(path);
+    if (entry && file && file.stat) {
+      entry.lmtime = file.stat.mtime;
+      this.index.set(path, entry);
+    }
+  }
+  async writeLocal(path, bytes, mtime) {
+    const ext = path.split("/").pop().split(".").pop().toLowerCase();
+    if (TEXT.has(ext)) {
+      let text = null;
+      try {
+        text = textDecoder.decode(bytes);
+      } catch (e) {
+      }
+      if (text !== null) {
+        return await this.storage.fsVault.write(path, text, mtime);
+      }
+    }
+    return await this.storage.fsVault.write(path, toArrayBuffer(bytes), mtime, true);
+  }
+  async renameLocal(from, to, meta) {
+    const source = app.vault.getAbstractFileByPath(from);
+    const entry = this.index.get(from);
+    if (!source || !entry || isDirty(entry) || app.vault.getAbstractFileByPath(to)) {
       return false;
     }
+    if (meta.type === "file" && (!(source instanceof import_obsidian5.TFile) || entry.sha1 !== meta.sha1)) {
+      return false;
+    }
+    this.index.set(to, Object.assign({}, entry, { synced: this.synced(meta), mtime: meta.mtime }));
+    this.index.set(from, Object.assign({}, entry, { action: "deleted", synced: { sha1: entry.sha1, action: "deleted" } }));
+    this.expectedRenames.add(from + "\n" + to);
+    if (source instanceof import_obsidian5.TFolder) {
+      for (const path of this.index.paths()) {
+        const child = this.index.get(path);
+        if (path.startsWith(from + "/") && child.action === "created") {
+          const moved = to + path.slice(from.length);
+          const existing = this.index.get(moved);
+          if (!existing || existing.action === "deleted") {
+            this.index.set(moved, Object.assign({}, child));
+          }
+          this.index.set(path, Object.assign({}, child, {
+            action: "deleted",
+            synced: { sha1: child.sha1, action: "deleted" }
+          }));
+          this.expectedRenames.add(path + "\n" + moved);
+        }
+      }
+    }
+    const parent = to.split("/").slice(0, -1).join("/");
+    if (parent && !app.vault.getAbstractFileByPath(parent)) {
+      await this.storage.fsVault.makeFolder(parent);
+    }
+    await app.vault.rename(source, to);
+    this.activity.add("renamed", to, from);
     return true;
   }
-  async listVersionHistory(path, callback) {
-    this.anysocket.send({
+  async applyDeleted(path, meta) {
+    const local = app.vault.getAbstractFileByPath(path);
+    const entry = this.index.get(path);
+    if (local instanceof import_obsidian5.TFile && !await this.localUnchanged(path)) {
+      if (entry) {
+        entry.synced = this.synced(meta);
+        this.index.set(path, entry);
+      }
+      return this.keepLocal(path);
+    }
+    this.index.set(path, {
+      type: meta.type === "folder" ? "folder" : "file",
+      action: "deleted",
+      sha1: meta.sha1 || entry && entry.sha1 || null,
+      lmtime: 0,
+      mtime: meta.mtime,
+      synced: this.synced(meta)
+    });
+    if (!local) {
+      return;
+    }
+    if (local instanceof import_obsidian5.TFolder && local.children.length > 0) {
+      return;
+    }
+    await app.fileManager.trashFile(local);
+    this.activity.add("deleted", path);
+  }
+  async pushAll(progress = () => {
+  }) {
+    const dirty = this.index.dirtyPaths();
+    const rank = (e) => e.from ? 0 : e.action === "created" ? e.type === "folder" ? 1 : 2 : e.type === "file" ? 3 : 4;
+    dirty.sort((a, b) => {
+      const ea = this.index.get(a), eb = this.index.get(b);
+      return rank(ea) - rank(eb) || (ea.action === "deleted" ? depth(b) - depth(a) : depth(a) - depth(b));
+    });
+    for (const path of dirty) {
+      if (!this.running)
+        return;
+      const entry = this.index.get(path);
+      if (entry && isDirty(entry)) {
+        await this.safely(path, () => this.push(path));
+      }
+      progress();
+    }
+  }
+  async push(path) {
+    let entry = this.index.get(path);
+    if (!entry) {
+      return;
+    }
+    if (entry.from) {
+      const from = entry.from;
+      delete entry.from;
+      this.index.set(path, entry);
+      const source = this.index.get(from);
+      if (source && source.synced && source.action === "deleted" && source.synced.action === "created") {
+        await this.renameRemote(from, path, source.synced);
+        entry = this.index.get(path);
+        if (!entry || !isDirty(entry)) {
+          return;
+        }
+      }
+    }
+    const meta = { type: entry.type, action: entry.action, sha1: entry.sha1, mtime: entry.mtime };
+    let data = null;
+    if (entry.type === "file" && entry.action === "created") {
+      const hashed = await this.hashFile(path);
+      if (!hashed) {
+        return;
+      }
+      data = hashed.data;
+      meta.sha1 = entry.sha1 = hashed.sha1;
+    }
+    const result = await this.rpc(LARGE_TIMEOUT).sync.put(path, meta, entry.synced ? {
+      sha1: entry.synced.sha1,
+      action: entry.synced.action
+    } : false, data || false);
+    await this.handlePutResult(path, entry, result);
+  }
+  async handlePutResult(path, entry, result) {
+    const current = this.index.get(path) || entry;
+    switch (result.result) {
+      case "unchanged":
+      case "applied":
+        current.synced = this.synced(result.meta);
+        this.index.set(path, current);
+        if (result.result === "applied") {
+          this.activity.add(entry.action === "deleted" ? "deleted_remote" : "uploaded", path);
+        }
+        break;
+      case "merged":
+        await this.download(path, result.meta);
+        this.activity.add("merged", path);
+        break;
+      case "kept_both":
+        if (result.meta.sha1 !== entry.sha1) {
+          await this.download(path, result.meta);
+        } else {
+          current.synced = this.synced(result.meta);
+          this.index.set(path, current);
+        }
+        if (result.copy) {
+          const copyMeta = await this.rpc().sync.meta(result.copy);
+          if (copyMeta) {
+            await this.applyCreated(result.copy, copyMeta);
+          }
+        }
+        this.activity.add("kept_both", path, result.copy);
+        this.xSync.onKeptBoth(path, result.copy);
+        break;
+      case "stale":
+        current.synced = null;
+        this.index.set(path, current);
+        await this.download(path, result.meta);
+        this.activity.add("restored", path);
+        this.xSync.onRestored(path);
+        break;
+    }
+  }
+  async renameRemote(from, to, base) {
+    const result = await this.rpc().sync.rename(from, to, { sha1: base.sha1, action: base.action });
+    if (result.result !== "renamed") {
+      return false;
+    }
+    const source = this.index.get(from);
+    const target = this.index.get(to);
+    if (source) {
+      source.synced = this.synced(result.tombstone);
+      this.index.set(from, source);
+    }
+    if (target) {
+      target.synced = this.synced(result.meta);
+      this.index.set(to, target);
+    }
+    this.activity.add("renamed", to, from);
+    return true;
+  }
+  canUpload() {
+    return this.running && this.peer && this.plugin.settings.autoSync;
+  }
+  async onLocalEvent(type, file, oldPath) {
+    if (!Utils_default.isSyncable(file.path)) {
+      return;
+    }
+    if (type === "rename") {
+      const key = oldPath + "\n" + file.path;
+      if (this.expectedRenames.has(key)) {
+        this.expectedRenames.delete(key);
+        return;
+      }
+      return this.onLocalRename(file, oldPath);
+    }
+    const offset = await this.clockOffset();
+    const entry = this.index.get(file.path);
+    if (type === "delete") {
+      if (!entry || entry.action === "deleted") {
+        return;
+      }
+      if (!entry.synced) {
+        this.index.remove(file.path);
+        return;
+      }
+      entry.action = "deleted";
+      entry.mtime = Date.now() + offset;
+      this.index.set(file.path, entry);
+      return this.schedulePush(file.path, 0);
+    }
+    if (file instanceof import_obsidian5.TFolder || !file.stat) {
+      if (entry && entry.action === "created") {
+        return;
+      }
+      this.index.set(file.path, {
+        type: "folder",
+        action: "created",
+        sha1: null,
+        lmtime: 0,
+        mtime: Date.now() + offset,
+        synced: entry ? entry.synced : null
+      });
+      return this.schedulePush(file.path, 0);
+    }
+    const hashed = await this.hashFile(file.path);
+    if (!hashed) {
+      return;
+    }
+    if (entry && entry.action === "created" && entry.sha1 === hashed.sha1) {
+      if (entry.lmtime !== file.stat.mtime) {
+        entry.lmtime = file.stat.mtime;
+        this.index.set(file.path, entry);
+      }
+      return;
+    }
+    this.index.set(file.path, {
+      type: "file",
+      action: "created",
+      sha1: hashed.sha1,
+      lmtime: file.stat.mtime,
+      mtime: file.stat.mtime + offset,
+      synced: entry ? entry.synced : null,
+      from: entry ? entry.from : void 0
+    });
+    const delay = type === "modify" ? this.plugin.settings.delayedSync * 1e3 : 0;
+    return this.schedulePush(file.path, delay);
+  }
+  async onLocalRename(file, oldPath) {
+    const source = this.index.get(oldPath);
+    const offset = await this.clockOffset();
+    const now = Date.now() + offset;
+    const isFolder = file instanceof import_obsidian5.TFolder || !file.stat;
+    const moved = source && source.action === "created" ? Object.assign({}, source, {
+      synced: null,
+      lmtime: isFolder ? 0 : file.stat.mtime
+    }) : {
+      type: isFolder ? "folder" : "file",
+      action: "created",
+      sha1: null,
+      lmtime: 0,
+      mtime: now,
+      synced: null
+    };
+    if (source && source.synced && source.synced.action === "created") {
+      moved.from = oldPath;
+    }
+    this.index.set(file.path, moved);
+    if (source) {
+      if (source.synced) {
+        source.action = "deleted";
+        source.mtime = now;
+        this.index.set(oldPath, source);
+      } else {
+        this.index.remove(oldPath);
+      }
+    }
+    if (!isFolder) {
+      const hashed = await this.hashFile(file.path);
+      if (hashed) {
+        moved.sha1 = hashed.sha1;
+        this.index.set(file.path, moved);
+      }
+    }
+    return this.schedulePush(file.path, 0);
+  }
+  schedulePush(path, delay) {
+    if (!this.canUpload()) {
+      this.status.pendingChanged(this.index.dirtyPaths().length);
+      return;
+    }
+    const run = () => this.enqueue(async () => {
+      const entry = this.index.get(path);
+      if (!entry || !isDirty(entry) || !this.peer) {
+        return;
+      }
+      this.status.set("syncing", { done: 0, total: 1 });
+      try {
+        if (entry.from) {
+          const from = entry.from;
+          await this.push(path);
+          const source = this.index.get(from);
+          if (source && isDirty(source)) {
+            await this.push(from);
+          }
+        } else {
+          await this.push(path);
+        }
+      } finally {
+        this.status.set("synced", { at: Date.now() });
+      }
+    });
+    if (delay > 0) {
+      this.xSync.xTimeouts.set(path, delay, run);
+    } else {
+      this.xSync.xTimeouts.clear(path);
+      return run();
+    }
+  }
+  onRemoteChanged(message) {
+    if (!this.running || !this.plugin.settings.autoSync) {
+      return;
+    }
+    if (message.epoch !== this.index.epoch) {
+      return this.syncNow();
+    }
+    return this.enqueue(async () => {
+      const toApply = [];
+      for (const [path, meta] of message.entries || []) {
+        if (!Utils_default.isSyncable(path))
+          continue;
+        const entry = this.index.get(path);
+        if (entry && sameState(entry, meta)) {
+          entry.synced = this.synced(meta);
+          this.index.set(path, entry);
+          continue;
+        }
+        if (entry && isDirty(entry)) {
+          this.schedulePush(path, 0);
+          continue;
+        }
+        toApply.push([path, meta]);
+      }
+      if (toApply.length) {
+        this.status.set("syncing", { done: 0, total: toApply.length });
+        let done = 0;
+        await this.applyRemote(toApply, () => this.status.set("syncing", { done: ++done, total: toApply.length }));
+        this.status.set("synced", { at: Date.now() });
+      }
+    });
+  }
+  async listVersions(path) {
+    return await this.rpc().sync.versions(path);
+  }
+  async readVersion(path, timestamp) {
+    return toUint8(await this.rpc(LARGE_TIMEOUT).sync.content(path, timestamp));
+  }
+  async listFiles(deletedOnly) {
+    return await this.rpc().sync.files(deletedOnly ? "deleted" : "all");
+  }
+  async restore(path, bytes) {
+    const parent = path.split("/").slice(0, -1).join("/");
+    if (parent && !app.vault.getAbstractFileByPath(parent)) {
+      await this.storage.fsVault.makeFolder(parent);
+    }
+    await this.writeLocal(path, bytes, null);
+  }
+  async listDevices() {
+    return await this.rpc().devices.list();
+  }
+  async approveDevice(id) {
+    return await this.rpc().devices.approve(id);
+  }
+  async declineDevice(id) {
+    return await this.rpc().devices.remove(id);
+  }
+  async revokeDevice(id) {
+    return await this.rpc().devices.revoke(id);
+  }
+  pendingCount() {
+    return this.index.dirtyPaths().length;
+  }
+  keptCopies() {
+    return app.vault.getFiles().filter((f) => KEPT_COPY.test(f.name)).map((f) => f.path);
+  }
+};
+
+// src/sync/LegacySync.ts
+var import_anysocket_browser2 = __toESM(require_anysocket_browser());
+var LegacySync = class {
+  constructor(xSync) {
+    this.deleteQueue = {};
+    this.isProcessingDeleteQueue = false;
+    this.unsentSessionEvents = {};
+    this.isSyncing = false;
+    this.running = false;
+    this.xSync = xSync;
+  }
+  get anysocket() {
+    return this.xSync.anysocket;
+  }
+  get storage() {
+    return this.xSync.storage;
+  }
+  get plugin() {
+    return this.xSync.plugin;
+  }
+  get xTimeouts() {
+    return this.xSync.xTimeouts;
+  }
+  get debug() {
+    return this.plugin.settings.debug;
+  }
+  get status() {
+    return this.xSync.status;
+  }
+  async start(peer) {
+    this.running = true;
+    this.deleteQueue = await this.storage.loadDeleteQueue();
+    await peer.rpc.setDeviceId(this.plugin.settings.deviceName || "Unknown device");
+    if (!this.plugin.settings.autoSync) {
+      await peer.rpc.autoSync(this.plugin.settings.autoSync);
+    }
+    if (Object.keys(this.deleteQueue).length > 0) {
+      await this.processDeleteQueue();
+    }
+    if (this.plugin.settings.autoSync) {
+      await this.sync();
+    } else {
+      this.status.set("paused", { pending: Object.keys(this.unsentSessionEvents).length });
+    }
+  }
+  async stop() {
+    this.running = false;
+    this.isSyncing = false;
+  }
+  syncNow() {
+    return this.sync();
+  }
+  onMessage(packet) {
+    switch (packet.msg.type) {
+      case "file_data":
+        this.onFileData(packet.msg.data, packet.peer);
+        break;
+      case "sync_complete":
+        this.onSyncCompleted(packet.peer);
+        break;
+    }
+  }
+  onLocalEvent(type, file, args) {
+    return this.processLocalEvent(type, file, args);
+  }
+  request(packet) {
+    return this.anysocket.request(packet);
+  }
+  async listVersions(path) {
+    return await this.request({
       type: "file_history",
       data: {
         type: "list_versions",
         path
       }
-    }, (packet) => {
-      callback(packet.msg);
     });
   }
-  async readVersionHistory(path, timestamp, callback) {
-    if (!this.connectionOK())
-      return;
-    this.anysocket.send({
+  async readVersion(path, timestamp) {
+    const isBinary = Utils_default.isBinary(path);
+    const data = await this.request({
       type: "file_history",
       data: {
         type: "read",
-        binary: Utils_default.isBinary(path),
+        binary: isBinary,
         path,
         timestamp
       }
-    }, (packet) => {
-      callback(packet.msg);
     });
+    if (data == null) {
+      return null;
+    }
+    return isBinary ? import_anysocket_browser2.default.Packer.unpack(data) : new TextEncoder().encode(data);
   }
-  async listFilesHistory(deletedOnly, callback) {
-    if (!this.connectionOK())
-      return;
-    this.anysocket.send({
+  async listFiles(deletedOnly) {
+    return await this.request({
       type: "file_history",
       data: {
         type: "list_files",
         mode: deletedOnly ? "deleted" : "all"
       }
-    }, (packet) => {
-      callback(packet.msg);
     });
+  }
+  async restore(path, bytes) {
+    const isBinary = Utils_default.isBinary(path);
+    const data = isBinary ? bytes : new TextDecoder().decode(bytes);
+    let metadata = await this.getMetadata("restore", { path, data });
+    metadata.sha1 = null;
+    if (isBinary) {
+      await this.storage.writeBinary(path, bytes, metadata);
+    } else {
+      await this.storage.write(path, data, metadata);
+    }
   }
   async processDeleteQueue() {
     if (!this.anysocket.isConnected)
@@ -4391,7 +5448,6 @@ var XSync = class {
         delete this.deleteQueue[path];
       }
       await this.storage.saveDeleteQueue(this.deleteQueue);
-      const remaining = Object.keys(this.deleteQueue).length;
     } finally {
       this.isProcessingDeleteQueue = false;
       if (Object.keys(this.deleteQueue).length > 0) {
@@ -4412,7 +5468,7 @@ var XSync = class {
     }
     this.unsentSessionEvents = {};
     this.isSyncing = true;
-    this.xNotify.notifyStatus(NotifyType.SYNCING);
+    this.status.set("syncing", { done: 0, total: 0 });
     this.debug && console.log("sync");
     await this.storage.computeTree();
     let data = [];
@@ -4430,10 +5486,7 @@ var XSync = class {
   }
   async onSyncCompleted(peer) {
     this.isSyncing = false;
-    this.xNotify.notifyStatus(NotifyType.SYNC_COMPLETED);
-  }
-  async onFocusChanged() {
-    this.xTimeouts.executeAll();
+    this.status.set("synced", { at: Date.now() });
   }
   async processLocalEvent(action, file, args, forceChanged = false) {
     if ((action == "create" || action == "modify") && this.deleteQueue[file.path]) {
@@ -4530,96 +5583,6 @@ var XSync = class {
       console.error("Error in _processLocalEvent:", e);
     }
   }
-  registerEvent(type) {
-    this.eventRefs[type] = app.vault.on(type, async (file, ...args) => {
-      if (!this.isEnabled)
-        return;
-      await this.processLocalEvent(type, file, args);
-    });
-  }
-  unregisterEvent(type) {
-    app.vault.offref(this.eventRefs[type]);
-  }
-  async load() {
-    if (!this.isEnabled)
-      return;
-    if (this.inited == true)
-      return;
-    this.inited = true;
-    this.anysocket.isEnabled = this.plugin.settings.syncEnabled;
-    this.debug = this.plugin.settings.debug;
-    await this.storage.init();
-    this.deleteQueue = await this.storage.loadDeleteQueue();
-    this.registerEvent("create");
-    this.registerEvent("modify");
-    this.registerEvent("delete");
-    this.registerEvent("rename");
-    let focusChanged = Utils_default.debounce(this.onFocusChanged.bind(this), 500);
-    this.eventRefs["active-leaf-change"] = app.workspace.on("active-leaf-change", focusChanged);
-    this.eventRefs["layout-change"] = app.workspace.on("layout-change", focusChanged);
-    this.anysocket.on("connected", async (peer) => {
-      this.xNotify.notifyStatus(NotifyType.CONNECTED);
-      let deviceName = this.plugin.settings.deviceName || null;
-      try {
-        if (deviceName != null && deviceName != "Unknown") {
-          await peer.rpc.setDeviceId(deviceName);
-        }
-        if (!this.plugin.settings.autoSync) {
-          await peer.rpc.autoSync(this.plugin.settings.autoSync);
-        }
-      } catch (e) {
-        console.error("AnySocket Sync - Device registration failed", e);
-        peer.disconnect("Device registration failed");
-        return;
-      }
-      if (Object.keys(this.deleteQueue).length > 0) {
-        await this.processDeleteQueue();
-      }
-      if (this.plugin.settings.autoSync) {
-        await this.sync();
-      } else {
-        this.xNotify.notifyStatus(NotifyType.AUTO_SYNC_DISABLED);
-      }
-    });
-    this.anysocket.on("message", (packet) => {
-      switch (packet.msg.type) {
-        case "file_data":
-          this.onFileData(packet.msg.data, packet.peer);
-          break;
-        case "sync_complete":
-          this.onSyncCompleted(packet.peer);
-          break;
-      }
-    });
-    this.anysocket.on("reload", this.reload.bind(this));
-    this.anysocket.on("unload", this.unload.bind(this));
-    this.anysocket.on("disconnected", () => {
-      this.xNotify.notifyStatus(NotifyType.CONNECTION_LOST);
-      this.debug && console.log("disconnected");
-    });
-    this.anysocket.init();
-  }
-  unload() {
-    clearTimeout(this.reloadTimeout);
-    if (this.inited == false)
-      return;
-    this.inited = false;
-    this.unregisterEvent("create");
-    this.unregisterEvent("modify");
-    this.unregisterEvent("delete");
-    this.unregisterEvent("rename");
-    app.workspace.offref(this.eventRefs["active-leaf-change"]);
-    app.workspace.offref(this.eventRefs["layout-change"]);
-    this.anysocket.stop();
-    this.anysocket.removeAllListeners();
-  }
-  reload() {
-    this.debug && console.log("reloaded");
-    this.unload();
-    this.reloadTimeout = setTimeout(() => {
-      this.load();
-    }, 1e3);
-  }
   async onFileData(data, peer) {
     this.debug && console.log("FileData:", data);
     if (!this.plugin.settings.autoSync && !this.isSyncing) {
@@ -4655,9 +5618,11 @@ var XSync = class {
               await this.storage.write(data.path, data.data, data.metadata);
             }
           }
+          this.xSync.activity.add("downloaded", data.path);
           break;
         case "deleted":
           await this.storage.delete(data.path, data.metadata);
+          this.xSync.activity.add("deleted", data.path);
           break;
       }
     }
@@ -4710,14 +5675,425 @@ var XSync = class {
       metadata
     };
   }
-  makeStatusBarItem(statusbar) {
-    this.xNotify.makeStatusBarItem(statusbar);
-  }
 };
 
+// src/XSync.ts
+var DEVICE_KEY = "anysocket-sync-device";
+var PROTOCOL_KEY = "anysocket-sync-protocol";
+var XSync = class {
+  constructor(plugin) {
+    this.isEnabled = false;
+    this.inited = false;
+    this.eventRefs = {};
+    this.reloadTimeout = null;
+    this.attentionTimeout = null;
+    this.engine = null;
+    this.protocol = 0;
+    this.server = null;
+    this.device = null;
+    this.revoked = false;
+    this.pendingNotice = null;
+    this.plugin = plugin;
+    this.status = new Status(plugin);
+    this.activity = new Activity();
+    this.storage = new Storage(plugin);
+    this.xTimeouts = new import_XTimeouts.default();
+    this.anysocket = new AnysocketManager(this);
+    this.v2 = new SyncV2(this);
+    this.legacy = new LegacySync(this);
+  }
+  get debug() {
+    return this.plugin.settings.debug;
+  }
+  async enabled(value) {
+    if (this.isEnabled !== value) {
+      this.isEnabled = value;
+      if (this.isEnabled) {
+        await this.load();
+      } else {
+        this.unload();
+      }
+    }
+  }
+  getDevice() {
+    let device = null;
+    try {
+      device = JSON.parse(app.loadLocalStorage(DEVICE_KEY) || "null");
+    } catch (e) {
+      device = null;
+    }
+    if (!device || !device.id || !device.secret) {
+      device = { id: Utils_default.randomId(16), secret: Utils_default.randomId(32) };
+      app.saveLocalStorage(DEVICE_KEY, JSON.stringify(device));
+    }
+    return device;
+  }
+  platform() {
+    if (import_obsidian6.Platform.isIosApp)
+      return "ios";
+    if (import_obsidian6.Platform.isAndroidApp)
+      return "android";
+    if (import_obsidian6.Platform.isMacOS)
+      return "macos";
+    if (import_obsidian6.Platform.isWin)
+      return "windows";
+    if (import_obsidian6.Platform.isLinux)
+      return "linux";
+    return import_obsidian6.Platform.isMobile ? "mobile" : "desktop";
+  }
+  get lastProtocol() {
+    return parseInt(app.loadLocalStorage(PROTOCOL_KEY) || "0") || 0;
+  }
+  set lastProtocol(value) {
+    app.saveLocalStorage(PROTOCOL_KEY, String(value));
+  }
+  async load() {
+    if (!this.isEnabled || this.inited) {
+      return;
+    }
+    this.inited = true;
+    this.anysocket.isEnabled = this.plugin.settings.syncEnabled;
+    await this.storage.init();
+    if (this.lastProtocol >= 2) {
+      await this.v2.index.load();
+    }
+    this.registerEvent("create");
+    this.registerEvent("modify");
+    this.registerEvent("delete");
+    this.registerEvent("rename");
+    let focusChanged = Utils_default.debounce(() => this.xTimeouts.executeAll(), 500);
+    this.eventRefs["active-leaf-change"] = app.workspace.on("active-leaf-change", focusChanged);
+    this.eventRefs["layout-change"] = app.workspace.on("layout-change", focusChanged);
+    this.anysocket.on("ready", (peer, version) => this.onReady(peer, version).catch((e) => {
+      console.error("AnySocket Sync - start failed", e);
+      peer.disconnect("start failed");
+    }));
+    this.anysocket.on("message", (packet) => this.onMessage(packet));
+    this.anysocket.on("failed", (reason) => this.status.set(reason, { pending: this.pendingCount() }));
+    this.anysocket.on("disconnected", (reason, wasConnected) => this.onDisconnected(reason, wasConnected));
+    this.anysocket.on("reload", this.reload.bind(this));
+    this.anysocket.on("unload", this.unload.bind(this));
+    this.updateAttention();
+    this.showUpdateNotice();
+    if (!this.plugin.settings.syncEnabled) {
+      this.status.set("disabled");
+      return;
+    }
+    if (this.revoked) {
+      this.status.set("revoked");
+      return;
+    }
+    this.anysocket.init();
+  }
+  unload() {
+    clearTimeout(this.reloadTimeout);
+    if (this.inited == false)
+      return;
+    this.inited = false;
+    this.unregisterEvent("create");
+    this.unregisterEvent("modify");
+    this.unregisterEvent("delete");
+    this.unregisterEvent("rename");
+    app.workspace.offref(this.eventRefs["active-leaf-change"]);
+    app.workspace.offref(this.eventRefs["layout-change"]);
+    this.stopEngine();
+    this.anysocket.stop();
+    this.anysocket.removeAllListeners();
+    if (this.v2.index.loaded) {
+      this.v2.index.save();
+    }
+  }
+  reload(delay) {
+    this.debug && console.log("reloaded");
+    this.unload();
+    clearTimeout(this.reloadTimeout);
+    this.reloadTimeout = setTimeout(() => {
+      this.load();
+    }, delay === void 0 ? this.anysocket.nextDelay() : delay);
+  }
+  destroy() {
+    this.unload();
+    this.anysocket.destroy();
+    this.status.unmount();
+  }
+  onBackground(hidden) {
+    if (hidden) {
+      this.unload();
+    } else if (this.isEnabled) {
+      this.reload(0);
+    }
+  }
+  stopEngine() {
+    if (this.engine) {
+      this.engine.stop();
+    }
+    this.engine = null;
+    this.xTimeouts.clearAll();
+  }
+  async onReady(peer, version) {
+    this.server = { version: version.server || null, protocol: version.protocol || 1 };
+    let hello = null;
+    try {
+      const device = this.getDevice();
+      hello = await peer.rpc.hello({
+        id: device.id,
+        secret: device.secret,
+        name: this.plugin.settings.deviceName || "Unknown device",
+        platform: this.platform(),
+        autoSync: this.plugin.settings.autoSync
+      });
+    } catch (e) {
+      if (!isMissingMethod(e)) {
+        throw e;
+      }
+    }
+    if (!hello) {
+      this.protocol = 1;
+      this.lastProtocol = 1;
+      this.status.notify("connected", NOTIFY.EVERYTHING);
+      this.engine = this.legacy;
+      return this.legacy.start(peer);
+    }
+    this.protocol = hello.protocol || 2;
+    this.lastProtocol = this.protocol;
+    this.device = hello.device;
+    if (hello.error) {
+      this.status.set("error", { message: hello.error });
+      return;
+    }
+    switch (hello.device.status) {
+      case "approved":
+        this.revoked = false;
+        this.hidePendingNotice();
+        this.status.notify("connected", NOTIFY.EVERYTHING);
+        this.engine = this.v2;
+        await this.v2.start(peer, hello);
+        this.checkDeviceRequests();
+        break;
+      case "pending":
+        this.status.set("waiting_approval");
+        this.showPendingNotice();
+        break;
+      case "revoked":
+        this.onRevoked();
+        break;
+    }
+  }
+  onDisconnected(reason, wasConnected) {
+    this.stopEngine();
+    if (this.revoked) {
+      return;
+    }
+    if (wasConnected && this.status.state !== "updating") {
+      this.status.set("offline", { pending: this.pendingCount() });
+    }
+  }
+  onRevoked() {
+    this.revoked = true;
+    this.stopEngine();
+    this.hidePendingNotice();
+    this.status.set("revoked");
+    this.status.notify("this device was removed from sync. Approve it again from another device or on the server to sync again.");
+    clearTimeout(this.reloadTimeout);
+    this.anysocket.stop();
+  }
+  pendingCount() {
+    if (this.lastProtocol >= 2 && this.v2.index.loaded) {
+      return this.v2.pendingCount();
+    }
+    return Object.keys(this.legacy.unsentSessionEvents).length + Object.keys(this.legacy.deleteQueue).length;
+  }
+  onMessage(packet) {
+    if (!packet.msg) {
+      return;
+    }
+    switch (packet.msg.type) {
+      case "changed":
+        if (this.engine === this.v2) {
+          this.v2.onRemoteChanged(packet.msg);
+        }
+        break;
+      case "device_request":
+        this.onDeviceRequest(packet.msg.device);
+        break;
+      case "devices_changed":
+        this.status.emit("devices");
+        break;
+      case "device_status":
+        if (packet.msg.status === "approved" && !this.engine) {
+          this.status.notify("this device was approved, syncing now");
+          this.reload(0);
+        } else if (packet.msg.status === "revoked") {
+          this.onRevoked();
+        }
+        break;
+      default:
+        if (this.engine === this.legacy) {
+          this.legacy.onMessage(packet);
+        }
+    }
+  }
+  showPendingNotice() {
+    if (this.pendingNotice) {
+      return;
+    }
+    const name = this.plugin.settings.deviceName;
+    this.pendingNotice = this.status.ask('"' + name + '" is waiting to be approved.\n\nOn a device that already syncs, open AnySocket Sync and approve it, or run on the server:\nnode cli.js devices approve "' + name + '"', [{ label: "OK", run: () => {
+    } }]);
+  }
+  hidePendingNotice() {
+    if (this.pendingNotice) {
+      this.pendingNotice.hide();
+      this.pendingNotice = null;
+    }
+  }
+  onDeviceRequest(device) {
+    this.status.emit("devices");
+    if (!device) {
+      return;
+    }
+    this.status.ask('"' + device.name + '" wants to sync with this vault. Is this your device?', [
+      { label: "Approve", cta: true, run: () => this.approveDevice(device.id) },
+      { label: "Decline", run: () => this.declineDevice(device.id) },
+      { label: "Later", run: () => {
+      } }
+    ]);
+  }
+  async checkDeviceRequests() {
+    try {
+      const devices = await this.v2.listDevices();
+      for (const device of devices.filter((d) => d.status === "pending" && d.online)) {
+        this.onDeviceRequest(device);
+      }
+    } catch (e) {
+    }
+  }
+  async listDevices() {
+    this.assertV2();
+    return await this.v2.listDevices();
+  }
+  async approveDevice(id) {
+    this.assertV2();
+    const device = await this.v2.approveDevice(id);
+    this.status.notify('approved "' + device.name + '"');
+    this.status.emit("devices");
+    return device;
+  }
+  async declineDevice(id) {
+    this.assertV2();
+    const device = await this.v2.declineDevice(id);
+    this.status.emit("devices");
+    return device;
+  }
+  async revokeDevice(id) {
+    this.assertV2();
+    const device = await this.v2.revokeDevice(id);
+    this.status.emit("devices");
+    return device;
+  }
+  assertV2() {
+    if (this.engine !== this.v2) {
+      throw new Error(this.protocol === 1 ? "Device management needs the 1.6.0 server" : "Not connected");
+    }
+  }
+  connectionOK() {
+    if (!this.isEnabled || !this.plugin.settings.syncEnabled) {
+      this.status.notify("sync is turned off in the settings");
+      return false;
+    }
+    if (!this.engine) {
+      this.status.notify(this.status.sentence());
+      return false;
+    }
+    return true;
+  }
+  async sync(full = false) {
+    if (!this.connectionOK()) {
+      return;
+    }
+    if (this.engine === this.v2) {
+      return this.v2.syncNow(full);
+    }
+    return this.legacy.syncNow();
+  }
+  registerEvent(type) {
+    this.eventRefs[type] = app.vault.on(type, async (file, ...args) => {
+      if (!this.isEnabled)
+        return;
+      if (type !== "modify") {
+        this.updateAttention();
+      }
+      try {
+        if (this.engine) {
+          await this.engine.onLocalEvent(type, file, type === "rename" ? args[0] : args);
+        } else if (this.lastProtocol >= 2) {
+          if (this.v2.index.loaded) {
+            await this.v2.onLocalEvent(type, file, type === "rename" ? args[0] : args);
+          }
+        } else {
+          await this.legacy.onLocalEvent(type, file, args);
+        }
+      } catch (e) {
+        console.error("AnySocket Sync - local change", file && file.path, e);
+      }
+    });
+  }
+  unregisterEvent(type) {
+    app.vault.offref(this.eventRefs[type]);
+  }
+  historyEngine() {
+    if (!this.connectionOK()) {
+      return null;
+    }
+    return this.engine;
+  }
+  updateAttention() {
+    clearTimeout(this.attentionTimeout);
+    this.attentionTimeout = setTimeout(() => {
+      this.status.attentionChanged(this.keptCopies().length);
+    }, 300);
+  }
+  keptCopies() {
+    return app.vault.getFiles().filter((f) => KEPT_COPY.test(f.name)).map((f) => f.path);
+  }
+  onKeptBoth(path, copy) {
+    const name = path.split("/").pop();
+    this.updateAttention();
+    this.status.ask('"' + name + '" was changed on two devices at the same time. Both versions were kept, nothing was lost.', [
+      { label: "Review", cta: true, run: () => this.plugin.openSyncPanel() },
+      { label: "OK", run: () => {
+      } }
+    ], 15e3);
+  }
+  onRestored(path) {
+    this.status.notify('"' + path.split("/").pop() + '" was changed on another device, so it was kept instead of deleted.');
+  }
+  showUpdateNotice() {
+    const raw = window.localStorage.getItem("anysocket-sync-updated");
+    if (!raw) {
+      return;
+    }
+    window.localStorage.removeItem("anysocket-sync-updated");
+    try {
+      const update = JSON.parse(raw);
+      if (update.to === this.plugin.VERSION) {
+        this.status.notify(update.downgrade ? "your server runs version " + update.to + ", so this device switched to it (from " + update.from + ")" : "updated to version " + update.to);
+      }
+    } catch (e) {
+    }
+  }
+  makeStatusBarItem(statusbar) {
+    this.status.mount(statusbar, () => this.plugin.openSyncPanel());
+  }
+};
+function isMissingMethod(e) {
+  return !!e && (e.code === "ENOMETHOD" || e.status === 404 || e.code === 404);
+}
+
 // src/libs/modals/VersionHistoryModal.ts
-var import_obsidian5 = require("obsidian");
-var VersionHistoryModal = class extends import_obsidian5.Modal {
+var import_obsidian7 = require("obsidian");
+var IMAGES = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", bmp: "image/bmp", avif: "image/avif" };
+var VersionHistoryModal = class extends import_obsidian7.Modal {
   constructor(plugin, path) {
     super(app);
     this.plugin = plugin;
@@ -4725,6 +6101,13 @@ var VersionHistoryModal = class extends import_obsidian5.Modal {
     this.name = "Unknown";
     this.versions = [];
     this.type = "created";
+    this.binary = Utils_default.isBinary(path);
+    this.selectedData = null;
+    this.objectUrl = null;
+    this.engine = plugin.xSync.historyEngine();
+    if (!this.engine) {
+      return;
+    }
     this.open();
     this.setup();
   }
@@ -4757,20 +6140,26 @@ var VersionHistoryModal = class extends import_obsidian5.Modal {
     });
     this.buttonRestore.disabled = true;
     this.buttonRestore.onclick = this.onRestore.bind(this);
-    let _originalContentEl = this.contentEl;
-    this.contentEl = elContent;
-    this.markdownView = new import_obsidian5.MarkdownPreviewView(this);
-    this.contentEl = _originalContentEl;
+    if (this.binary) {
+      this.previewEl = elContent.createDiv("version-binary-preview");
+    } else {
+      let _originalContentEl = this.contentEl;
+      this.contentEl = elContent;
+      this.markdownView = new import_obsidian7.MarkdownPreviewView(this);
+      this.contentEl = _originalContentEl;
+    }
     if (this.app.isMobile && this.isPortrait()) {
       this.elContainer.hide();
     }
-    this.plugin.xSync.listVersionHistory(this.path, (data) => {
+    const loading = this.elList.createDiv({ text: "Loading\u2026", cls: "version-timestamp version-message" });
+    this.engine.listVersions(this.path).then((data) => {
+      loading.remove();
       this.versions = [];
-      if (!data || data.data.length <= 0) {
+      if (!data || !data.data || data.data.length <= 0) {
         this.elList.createDiv({
-          text: "No version history found",
-          cls: "version-timestamp"
-        }).style.opacity = "0.5";
+          text: "No versions on the server yet",
+          cls: "version-timestamp version-message"
+        });
         return;
       }
       if (data.deleted) {
@@ -4791,43 +6180,75 @@ var VersionHistoryModal = class extends import_obsidian5.Modal {
       if (this.versions.length > 0 && (!this.app.isMobile || !this.isPortrait())) {
         this.internalItemSelect(this.versions[0]);
       }
+    }).catch((e) => {
+      loading.setText("Couldn't load the history: " + (e.message || e.error || e));
     });
   }
   formatTimestamp(timestamp) {
-    let date = new Date(timestamp);
-    let month = date.getMonth() + 1;
-    let day = date.getDate();
-    let year = date.getFullYear();
-    let hours = date.getHours();
-    let minutes = date.getMinutes();
-    let ampm = hours >= 12 ? "PM" : "AM";
-    hours = hours % 12;
-    hours = hours ? hours : 12;
-    minutes = minutes < 10 ? "0" + minutes : minutes;
-    return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
+    return new Date(timestamp).toLocaleString(void 0, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit"
+    });
   }
   internalItemSelect(item) {
     this.versions.forEach((v) => v.el.removeClass("active"));
     item.el.addClass("active");
-    this.plugin.xSync.readVersionHistory(this.path, item.timestamp, (data) => {
-      if (typeof data !== "string") {
-        data = "";
-      }
-      this.markdownView.set(data, true);
-      this.markdownView.applyScroll(0);
-    });
     this.selectedVersion = item;
+    this.selectedData = null;
+    this.buttonRestore.disabled = true;
+    this.engine.readVersion(this.path, item.timestamp).then((bytes) => {
+      if (this.selectedVersion !== item) {
+        return;
+      }
+      this.selectedData = bytes;
+      if (this.binary) {
+        this.showBinary(bytes);
+      } else {
+        this.markdownView.set(bytes ? new TextDecoder().decode(bytes) : "", true);
+        this.markdownView.applyScroll(0);
+      }
+      this.updateRestoreButton();
+    }).catch((e) => {
+      new import_obsidian7.Notice("AnySocket Sync: couldn't load this version (" + (e.message || e.error || e) + ")");
+    });
+    if (this.app.isMobile && this.isPortrait()) {
+      this.elContainer.show();
+      this.elList.hide();
+    }
+  }
+  updateRestoreButton() {
     const isCurrentVersion = this.type === "created" && this.versions.length > 0 && this.selectedVersion.timestamp === this.versions[0].timestamp;
     if (isCurrentVersion) {
       this.buttonRestore.textContent = "Current";
       this.buttonRestore.disabled = true;
     } else {
       this.buttonRestore.textContent = "Restore";
-      this.buttonRestore.disabled = false;
+      this.buttonRestore.disabled = this.selectedData == null;
     }
-    if (this.app.isMobile && this.isPortrait()) {
-      this.elContainer.show();
-      this.elList.hide();
+  }
+  showBinary(bytes) {
+    this.previewEl.empty();
+    if (this.objectUrl) {
+      URL.revokeObjectURL(this.objectUrl);
+      this.objectUrl = null;
+    }
+    const ext = this.path.split(".").pop().toLowerCase();
+    if (bytes && IMAGES[ext]) {
+      this.objectUrl = URL.createObjectURL(new Blob([bytes], { type: IMAGES[ext] }));
+      this.previewEl.createEl("img", { attr: { src: this.objectUrl } });
+    } else {
+      this.previewEl.createDiv({
+        cls: "version-message",
+        text: bytes ? "No preview for this file type (" + Math.max(1, Math.round(bytes.length / 1024)) + " KB)" : "This version is not available"
+      });
+    }
+  }
+  onClose() {
+    if (this.objectUrl) {
+      URL.revokeObjectURL(this.objectUrl);
     }
   }
   isPortrait() {
@@ -4840,15 +6261,16 @@ var VersionHistoryModal = class extends import_obsidian5.Modal {
     }
   }
   async onRestore() {
-    let data = this.markdownView.get();
-    let metadata = await this.plugin.xSync.getMetadata("restore", {
-      path: this.path,
-      data
-    });
-    metadata.sha1 = null;
-    await this.plugin.xSync.storage.write(this.path, data, metadata);
-    new import_obsidian5.Notice("Restored - " + this.name + " (" + this.formatTimestamp(this.selectedVersion.timestamp) + ")");
-    this.close();
+    if (this.selectedData == null) {
+      return;
+    }
+    try {
+      await this.engine.restore(this.path, this.selectedData);
+      new import_obsidian7.Notice("Restored " + this.name + " (" + this.formatTimestamp(this.selectedVersion.timestamp) + ")");
+      this.close();
+    } catch (e) {
+      new import_obsidian7.Notice("AnySocket Sync: couldn't restore (" + (e.message || e.error || e) + ")");
+    }
   }
 };
 
@@ -4856,9 +6278,8 @@ var VersionHistoryModal = class extends import_obsidian5.Modal {
 var import_os = require("os");
 
 // src/libs/modals/FilesHistoryModal.ts
-var import_obsidian6 = require("obsidian");
-var import_anysocket_browser3 = __toESM(require_anysocket_browser());
-var FilesHistoryModal = class extends import_obsidian6.SuggestModal {
+var import_obsidian8 = require("obsidian");
+var FilesHistoryModal = class extends import_obsidian8.SuggestModal {
   constructor(plugin, deletedOnly = false) {
     super(app);
     this.plugin = plugin;
@@ -4869,9 +6290,16 @@ var FilesHistoryModal = class extends import_obsidian6.SuggestModal {
     } else {
       this.setPlaceholder("Search for files...");
     }
-    this.plugin.xSync.listFilesHistory(this.deletedOnly, (data) => {
-      this.data = data;
+    this.emptyStateText = this.deletedOnly ? "No deleted files on the server" : "No files on the server";
+    this.engine = plugin.xSync.historyEngine();
+    if (!this.engine) {
+      return;
+    }
+    this.engine.listFiles(this.deletedOnly).then((data) => {
+      this.data = (data || []).sort((a, b) => b.mtime - a.mtime);
       this.open();
+    }).catch((e) => {
+      new import_obsidian8.Notice("AnySocket Sync: couldn't load the files (" + (e.message || e.error || e) + ")");
     });
     this.containerEl.addClass("anysocket-files-history");
   }
@@ -4879,20 +6307,20 @@ var FilesHistoryModal = class extends import_obsidian6.SuggestModal {
     return this.data.filter((item) => item.path.toLowerCase().includes(query.toLowerCase()));
   }
   async onChooseSuggestion(item, evt) {
-    if (Utils_default.isBinary(item.path)) {
-      let parts = item.path.split("/");
-      await this.plugin.xSync.listVersionHistory(item.path, async (data) => {
-        await this.plugin.xSync.readVersionHistory(item.path, data.data[0], async (data2) => {
-          data2 = import_anysocket_browser3.default.Packer.unpack(data2);
-          let metadata = await this.plugin.xSync.getMetadata("restore", {
-            path: item.path,
-            data: data2
-          });
-          metadata.sha1 = null;
-          await this.plugin.xSync.storage.writeBinary(item.path, data2, metadata);
-          new import_obsidian6.Notice("Restored - " + parts[parts.length - 1]);
-        });
-      });
+    if (Utils_default.isBinary(item.path) && this.plugin.xSync.protocol < 2) {
+      let name = item.path.split("/").pop();
+      try {
+        const versions = await this.engine.listVersions(item.path);
+        if (!versions || !versions.data || !versions.data.length) {
+          new import_obsidian8.Notice("No versions of " + name + " on the server");
+          return;
+        }
+        const bytes = await this.engine.readVersion(item.path, versions.data[0]);
+        await this.engine.restore(item.path, bytes);
+        new import_obsidian8.Notice("Restored - " + name);
+      } catch (e) {
+        new import_obsidian8.Notice("AnySocket Sync: couldn't restore " + name + " (" + (e.message || e.error || e) + ")");
+      }
     } else {
       new VersionHistoryModal(this.plugin, item.path);
     }
@@ -4903,28 +6331,236 @@ var FilesHistoryModal = class extends import_obsidian6.SuggestModal {
     if (this.deletedOnly) {
       prefix = "Deleted: ";
     }
-    el.createEl("div", { text: prefix + this.formatTimestamp(value.mtime) }).addClass("item-metadata");
+    el.createEl("div", { text: prefix + new Date(value.mtime).toLocaleString(void 0, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit"
+    }) }).addClass("item-metadata");
   }
-  formatTimestamp(timestamp) {
-    let date = new Date(timestamp);
-    let month = date.getMonth() + 1;
-    let day = date.getDate();
-    let year = date.getFullYear();
-    let hours = date.getHours();
-    let minutes = date.getMinutes();
-    let ampm = hours >= 12 ? "PM" : "AM";
-    hours = hours % 12;
-    hours = hours ? hours : 12;
-    minutes = minutes < 10 ? "0" + minutes : minutes;
-    return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
+};
+
+// src/libs/modals/SyncPanelModal.ts
+var import_obsidian9 = require("obsidian");
+function originalOf(copy) {
+  return copy.replace(/ \(.+'s version, [A-Z][a-z]{2} \d{1,2}( \d+)?\)(\.[^./]+)?$/, "$2");
+}
+var SyncPanelModal = class extends import_obsidian9.Modal {
+  constructor(plugin) {
+    super(app);
+    this.devices = null;
+    this.devicesError = null;
+    this.plugin = plugin;
+    this.refresh = Utils_default.debounce(() => this.render(), 150);
+    this.onDevices = () => this.loadDevices();
+  }
+  get xSync() {
+    return this.plugin.xSync;
+  }
+  onOpen() {
+    this.modalEl.addClass("anysocket-panel");
+    this.titleEl.setText("AnySocket Sync");
+    this.xSync.status.on("change", this.refresh);
+    this.xSync.status.on("devices", this.onDevices);
+    this.xSync.activity.on("change", this.refresh);
+    this.render();
+    this.loadDevices();
+  }
+  cleanup() {
+    this.xSync.status.off("change", this.refresh);
+    this.xSync.status.off("devices", this.onDevices);
+    this.xSync.activity.off("change", this.refresh);
+  }
+  async loadDevices() {
+    if (this.xSync.protocol < 2 || !this.xSync.engine) {
+      this.devices = null;
+      this.devicesError = this.xSync.protocol === 1 ? "Update your server to 1.6.0 to manage devices." : "Connect to see your devices.";
+      return this.render();
+    }
+    try {
+      this.devices = await this.xSync.listDevices();
+      this.devicesError = null;
+    } catch (e) {
+      this.devices = null;
+      this.devicesError = "Couldn't load devices: " + (e.message || e.error || e);
+    }
+    this.render();
+  }
+  render() {
+    const el = this.contentEl;
+    el.empty();
+    const status = this.xSync.status;
+    const head = el.createDiv({ cls: "anysocket-panel-status" });
+    head.setAttr("data-tone", status.statusBarEl ? status.statusBarEl.getAttr("data-tone") : "");
+    const icon = head.createDiv({ cls: "anysocket-panel-status-icon" });
+    (0, import_obsidian9.setIcon)(icon, { synced: "check-circle", syncing: "refresh-cw", connecting: "refresh-cw" }[status.state] || "info");
+    const text = head.createDiv({ cls: "anysocket-panel-status-text" });
+    text.createDiv({ cls: "anysocket-panel-status-title", text: status.shortText() });
+    text.createDiv({ cls: "anysocket-panel-status-desc", text: status.sentence() });
+    const actions = head.createDiv({ cls: "anysocket-panel-status-actions" });
+    if (this.xSync.engine) {
+      actions.createEl("button", { text: "Sync now", cls: "mod-cta" }).addEventListener("click", () => this.xSync.sync());
+    } else {
+      actions.createEl("button", { text: "Settings" }).addEventListener("click", () => {
+        this.close();
+        app.setting.open();
+        app.setting.openTabById("anysocket-sync");
+      });
+    }
+    const copies = this.xSync.keptCopies();
+    if (copies.length > 0) {
+      this.section(el, "Needs your attention", "alert-triangle");
+      const list = el.createDiv({ cls: "anysocket-panel-list" });
+      for (const copy of copies) {
+        const original = originalOf(copy);
+        const row = list.createDiv({ cls: "anysocket-panel-item is-attention" });
+        const body = row.createDiv({ cls: "anysocket-panel-item-body" });
+        body.createDiv({ text: original.split("/").pop() + " was changed on two devices", cls: "anysocket-panel-item-title" });
+        body.createDiv({
+          text: 'Both versions were kept. The other one is "' + copy.split("/").pop() + '". Look at both, keep what you need, then remove the extra copy.',
+          cls: "anysocket-panel-item-desc"
+        });
+        const buttons = row.createDiv({ cls: "anysocket-panel-item-actions" });
+        buttons.createEl("button", { text: "Open both" }).addEventListener("click", () => this.openBoth(original, copy));
+        buttons.createEl("button", { text: "Done, remove the copy" }).addEventListener("click", async () => {
+          const file = app.vault.getAbstractFileByPath(copy);
+          if (file) {
+            await app.fileManager.trashFile(file);
+            new import_obsidian9.Notice('Removed "' + copy.split("/").pop() + '"');
+          }
+          this.render();
+        });
+      }
+    }
+    this.section(el, "Devices", "monitor-smartphone");
+    const devicesEl = el.createDiv({ cls: "anysocket-panel-list" });
+    if (this.devicesError) {
+      devicesEl.createDiv({ cls: "anysocket-panel-empty", text: this.devicesError });
+    } else if (!this.devices) {
+      devicesEl.createDiv({ cls: "anysocket-panel-empty", text: "Loading\u2026" });
+    } else {
+      const order = { pending: 0, approved: 1, revoked: 2 };
+      const devices = this.devices.slice().sort((a, b) => order[a.status] - order[b.status] || (b.last_online || 0) - (a.last_online || 0));
+      for (const device of devices) {
+        this.renderDevice(devicesEl, device);
+      }
+    }
+    this.section(el, "Recent activity", "history");
+    const activityEl = el.createDiv({ cls: "anysocket-panel-list is-compact" });
+    const items = this.xSync.activity.items.slice(0, 20);
+    if (items.length === 0) {
+      activityEl.createDiv({ cls: "anysocket-panel-empty", text: "Nothing yet in this session." });
+    }
+    for (const item of items) {
+      const described = Activity.describe(item);
+      const row = activityEl.createDiv({ cls: "anysocket-panel-activity" + (item.type === "failed" || item.type === "kept_both" ? " is-warn" : "") });
+      (0, import_obsidian9.setIcon)(row.createSpan({ cls: "anysocket-panel-activity-icon" }), described.icon);
+      const label = row.createSpan({ cls: "anysocket-panel-activity-text", text: described.text });
+      label.setAttr("aria-label", item.path);
+      row.createSpan({ cls: "anysocket-panel-activity-time", text: Utils_default.ago(item.at) });
+      if (app.vault.getAbstractFileByPath(item.path) instanceof import_obsidian9.TFile) {
+        row.addClass("is-clickable");
+        row.addEventListener("click", () => {
+          this.close();
+          app.workspace.openLinkText(item.path, "", false);
+        });
+      }
+    }
+    const about = el.createDiv({ cls: "anysocket-panel-about" });
+    const settings = this.plugin.settings;
+    const parts = ["This device: " + settings.deviceName, "Server: " + settings.host + ":" + settings.port];
+    if (this.xSync.server && this.xSync.server.version) {
+      parts.push("server version " + this.xSync.server.version);
+    }
+    const peer = this.xSync.anysocket.peer;
+    const info = peer && peer.e2eInfo && peer.e2eInfo();
+    if (info && info.cipher) {
+      parts.push("encrypted (" + info.cipher.toUpperCase() + ")");
+    }
+    parts.push("plugin " + this.plugin.VERSION);
+    about.setText(parts.join(" \xB7 "));
+  }
+  section(el, title, icon) {
+    const header = el.createDiv({ cls: "anysocket-panel-section" });
+    (0, import_obsidian9.setIcon)(header.createSpan(), icon);
+    header.createSpan({ text: title });
+  }
+  renderDevice(el, device) {
+    const isMe = this.xSync.device && device.id === this.xSync.device.id;
+    const row = el.createDiv({ cls: "anysocket-panel-item" + (device.status === "pending" ? " is-attention" : "") + (device.status === "revoked" ? " is-muted" : "") });
+    const iconEl = row.createDiv({ cls: "anysocket-panel-item-icon" });
+    (0, import_obsidian9.setIcon)(iconEl, ["ios", "android", "mobile"].indexOf(device.platform) !== -1 ? "smartphone" : "monitor");
+    const body = row.createDiv({ cls: "anysocket-panel-item-body" });
+    body.createDiv({ cls: "anysocket-panel-item-title", text: device.name + (isMe ? " (this device)" : "") });
+    let desc = "";
+    if (device.status === "pending") {
+      desc = "Wants to sync with this vault. Approve it only if it's your device.";
+    } else if (device.status === "revoked") {
+      desc = "Removed, can't sync";
+    } else {
+      desc = device.online ? "Online" : "Last seen " + (Utils_default.ago(device.last_online) || "never");
+    }
+    body.createDiv({ cls: "anysocket-panel-item-desc", text: desc });
+    const buttons = row.createDiv({ cls: "anysocket-panel-item-actions" });
+    const act = (label, cta, fn, confirm) => {
+      const button = buttons.createEl("button", { text: label, cls: cta ? "mod-cta" : "" });
+      button.addEventListener("click", async () => {
+        if (confirm && button.getAttr("data-confirm") !== "1") {
+          button.setAttr("data-confirm", "1");
+          button.setText(confirm);
+          button.addClass("mod-warning");
+          return;
+        }
+        button.setDisabled(true);
+        try {
+          await fn();
+        } catch (e) {
+          new import_obsidian9.Notice("AnySocket Sync: " + (e.message || e.error || e));
+        }
+        await this.loadDevices();
+      });
+    };
+    if (device.status === "pending") {
+      act("Approve", true, () => this.xSync.approveDevice(device.id));
+      act("Decline", false, () => this.xSync.declineDevice(device.id));
+    } else if (device.status === "revoked") {
+      act("Approve again", false, () => this.xSync.approveDevice(device.id));
+    } else if (!isMe) {
+      act("Remove", false, () => this.xSync.revokeDevice(device.id), "Really remove?");
+    }
+  }
+  async openBoth(original, copy) {
+    this.close();
+    const first = app.vault.getAbstractFileByPath(original);
+    const second = app.vault.getAbstractFileByPath(copy);
+    if (first instanceof import_obsidian9.TFile) {
+      await app.workspace.getLeaf("tab").openFile(first);
+    }
+    if (second instanceof import_obsidian9.TFile) {
+      await app.workspace.getLeaf("split").openFile(second);
+    }
   }
 };
 
 // src/main.ts
 var import_ua_parser_js = __toESM(require_ua_parser());
+var import_anysocket_browser3 = __toESM(require_anysocket_browser());
 var deviceInfo = new import_ua_parser_js.UAParser(navigator.userAgent).getDevice();
 function getDefaultDeviceName() {
-  return import_obsidian7.Platform.isDesktop ? (0, import_os.hostname)() : deviceInfo.model || "Unknown";
+  if (import_obsidian10.Platform.isDesktop) {
+    return (0, import_os.hostname)();
+  }
+  if (deviceInfo.model) {
+    return deviceInfo.model;
+  }
+  if (import_obsidian10.Platform.isIosApp) {
+    return import_obsidian10.Platform.isTablet ? "iPad" : "iPhone";
+  }
+  if (import_obsidian10.Platform.isAndroidApp) {
+    return import_obsidian10.Platform.isTablet ? "Android tablet" : "Android phone";
+  }
+  return "Mobile";
 }
 var DEFAULT_SETTINGS = {
   host: "127.0.0.1",
@@ -4937,12 +6573,13 @@ var DEFAULT_SETTINGS = {
   deviceName: getDefaultDeviceName(),
   debug: false
 };
-var AnySocketSyncPlugin = class extends import_obsidian7.Plugin {
+var AnySocketSyncPlugin = class extends import_obsidian10.Plugin {
   constructor() {
     super(...arguments);
     this.VERSION = "1.6.0";
-    this.BUILD = "1793021605196";
+    this.BUILD = "1793023643104";
     this.isReady = false;
+    this.panel = null;
   }
   async onload() {
     await this.loadSettings();
@@ -4950,7 +6587,7 @@ var AnySocketSyncPlugin = class extends import_obsidian7.Plugin {
       if (!file.stat) {
         return;
       }
-      if (!Utils_default.isBinary(file.path)) {
+      if (!Utils_default.isBinary(file.path) || this.xSync.protocol >= 2) {
         menu.addItem((item) => {
           item.setTitle("Version history").setIcon("history").onClick(async () => {
             new VersionHistoryModal(this, file.path);
@@ -4984,6 +6621,11 @@ var AnySocketSyncPlugin = class extends import_obsidian7.Plugin {
         new FilesHistoryModal(this, true);
       }
     });
+    this.addCommand({
+      id: "open-sync-panel",
+      name: "Open sync panel (status, devices, activity)",
+      callback: () => this.openSyncPanel()
+    });
     this.addSettingTab(new AnySocketSyncSettingTab(this));
     this.xSync = new XSync(this);
     this.xSync.makeStatusBarItem(this.addStatusBarItem());
@@ -5001,57 +6643,95 @@ var AnySocketSyncPlugin = class extends import_obsidian7.Plugin {
   }
   async onunload() {
     await this.xSync.enabled(false);
+    this.xSync.destroy();
   }
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    if (!this.settings.deviceName || this.settings.deviceName === "Unknown") {
+      this.settings.deviceName = getDefaultDeviceName();
+    }
   }
   async saveSettings() {
     await this.saveData(this.settings);
-    this.xSync.reload();
+    this.xSync.revoked = false;
+    this.xSync.anysocket.attempts = 0;
+    this.xSync.reload(0);
   }
-  getSVGIcon() {
-    return '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide-send"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"></path><path d="m21.854 2.147-10.94 10.939"></path></svg>';
+  openSyncPanel() {
+    if (this.panel) {
+      return;
+    }
+    this.panel = new SyncPanelModal(this);
+    this.panel.onClose = () => {
+      var _a;
+      (_a = this.panel) == null ? void 0 : _a.cleanup();
+      this.panel = null;
+    };
+    this.panel.open();
   }
 };
-var AnySocketSyncSettingTab = class extends import_obsidian7.PluginSettingTab {
+var AnySocketSyncSettingTab = class extends import_obsidian10.PluginSettingTab {
   constructor(plugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
+  textSetting(name, desc, key, placeholder, options = {}) {
+    return new import_obsidian10.Setting(this.containerEl).setName(name).setDesc(desc).addText((text) => {
+      text.setPlaceholder(placeholder).setValue(this.plugin.settings[key]);
+      if (options.password) {
+        text.inputEl.type = "password";
+      }
+      text.inputEl.addEventListener("change", async () => {
+        let value = text.getValue().trim();
+        if (!value && options.fallback) {
+          value = options.fallback();
+          text.setValue(value);
+        }
+        if (this.plugin.settings[key] !== value) {
+          this.plugin.settings[key] = value;
+          await this.plugin.saveSettings();
+        }
+      });
+    });
+  }
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    new import_obsidian7.Setting(containerEl).setName("Connection settings").setHeading();
-    new import_obsidian7.Setting(containerEl).setName("Device name").addText((text) => text.setPlaceholder(getDefaultDeviceName()).setValue(this.plugin.settings.deviceName).onChange(async (value) => {
-      if (value == "") {
-        value = getDefaultDeviceName();
-      }
-      this.plugin.settings.deviceName = value;
-      await this.plugin.saveSettings();
-    }));
-    new import_obsidian7.Setting(containerEl).setName("Host").addText((text) => text.setPlaceholder("127.0.0.1").setValue(this.plugin.settings.host).onChange(async (value) => {
-      this.plugin.settings.host = value;
-      await this.plugin.saveSettings();
-    }));
-    new import_obsidian7.Setting(containerEl).setName("Port").addText((text) => text.setPlaceholder("3000").setValue(this.plugin.settings.port).onChange(async (value) => {
-      this.plugin.settings.port = value;
-      await this.plugin.saveSettings();
-    }));
-    new import_obsidian7.Setting(containerEl).setName("Password").addText((text) => {
-      text.setPlaceholder("pass").setValue(this.plugin.settings.password).onChange(async (value) => {
-        this.plugin.settings.password = value;
-        await this.plugin.saveSettings();
-      });
-      text.inputEl.type = "password";
+    containerEl.addClass("anysocket-settings");
+    const summary = new import_obsidian10.Setting(containerEl).setName("Status").addButton((button) => button.setButtonText("Open sync panel").onClick(() => this.plugin.openSyncPanel()));
+    this.statusEl = summary.descEl;
+    const update = () => this.statusEl.setText(this.plugin.xSync.status.sentence());
+    update();
+    this.onStatus = update;
+    this.plugin.xSync.status.on("change", this.onStatus);
+    new import_obsidian10.Setting(containerEl).setName("Connection").setHeading();
+    this.textSetting("Device name", "How this device appears to your other devices.", "deviceName", getDefaultDeviceName(), {
+      fallback: getDefaultDeviceName
     });
-    new import_obsidian7.Setting(containerEl).setName("Enable Connection").addToggle((toggle) => {
+    this.textSetting("Host", "Your server's address, e.g. sync.example.com or 192.168.1.10", "host", "127.0.0.1");
+    this.textSetting("Port", "", "port", "3000");
+    this.textSetting("Password", `The "password" from the server's config.js`, "password", "password", { password: true });
+    const test = new import_obsidian10.Setting(containerEl).setName("Test connection").setDesc("Checks the address and password above.");
+    test.addButton((button) => button.setButtonText("Test").onClick(async () => {
+      button.setDisabled(true);
+      test.setDesc("Testing\u2026");
+      test.setDesc(await testConnection(this.plugin.settings));
+      button.setDisabled(false);
+    }));
+    new import_obsidian10.Setting(containerEl).setName("Enable connection").setDesc("Connect to the server and sync this vault.").addToggle((toggle) => {
       toggle.setValue(this.plugin.settings.syncEnabled).onChange(async (value) => {
         this.plugin.settings.syncEnabled = value;
         await this.plugin.saveSettings();
       });
     });
-    new import_obsidian7.Setting(containerEl).setName("Sync settings").setHeading();
-    new import_obsidian7.Setting(containerEl).setName("Delayed Sync").setDesc("Delay sync until no changes for the specified duration (or focus changed)").addDropdown((dropdown) => {
+    new import_obsidian10.Setting(containerEl).setName("Sync").setHeading();
+    new import_obsidian10.Setting(containerEl).setName("Auto sync").setDesc('Sync changes as they happen. When off, use the "Sync now" command.').addToggle((toggle) => {
+      toggle.setValue(this.plugin.settings.autoSync).onChange(async (value) => {
+        this.plugin.settings.autoSync = value;
+        await this.plugin.saveSettings();
+      });
+    });
+    new import_obsidian10.Setting(containerEl).setName("Delayed sync").setDesc("Wait this long after you stop typing before sending a change (or until you switch notes).").addDropdown((dropdown) => {
       dropdown.addOption("0", "Instant");
       dropdown.addOption("3", "3s");
       dropdown.addOption("4", "4s");
@@ -5070,29 +6750,55 @@ var AnySocketSyncSettingTab = class extends import_obsidian7.PluginSettingTab {
         await this.plugin.saveSettings();
       });
     });
-    new import_obsidian7.Setting(containerEl).setName("Auto Sync").setDesc("Automatically sync when local/remote changes are detected").addToggle((toggle) => {
-      toggle.setValue(this.plugin.settings.autoSync).onChange(async (value) => {
-        this.plugin.settings.autoSync = value;
-        await this.plugin.saveSettings();
-      });
-    });
-    new import_obsidian7.Setting(containerEl).setName("Notifications").addDropdown((dropdown) => {
+    new import_obsidian10.Setting(containerEl).setName("Notifications").setDesc("Pop-ups. The status bar always shows what is going on.").addDropdown((dropdown) => {
       dropdown.addOption("0", "Off");
-      dropdown.addOption("1", "Connection status");
-      dropdown.addOption("2", "Connection & sync status");
+      dropdown.addOption("1", "Important only");
+      dropdown.addOption("2", "Everything");
       dropdown.setValue(this.plugin.settings.notifications.toString()).onChange(async (value) => {
         this.plugin.settings.notifications = parseInt(value);
         await this.plugin.saveSettings();
       });
     });
-    new import_obsidian7.Setting(containerEl).setName("Debug").addToggle((toggle) => toggle.setValue(this.plugin.settings.debug).onChange(async (value) => {
+    new import_obsidian10.Setting(containerEl).setName("Advanced").setHeading();
+    new import_obsidian10.Setting(containerEl).setName("Debug").setDesc("Log what sync does to the developer console.").addToggle((toggle) => toggle.setValue(this.plugin.settings.debug).onChange(async (value) => {
       this.plugin.settings.debug = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian7.Setting(containerEl).setName("Rebuild index").setDesc("It will reindex all the files in the vault").addButton((button) => button.setButtonText("Rebuild").onClick(async () => {
+    new import_obsidian10.Setting(containerEl).setName("Rebuild index").setDesc("Forget what this device knows about synced files and compare everything with the server again. Nothing is deleted; if a file differs, both versions are kept.").addButton((button) => button.setButtonText("Rebuild").onClick(async () => {
       await this.plugin.xSync.storage.dropMetadata();
-      this.plugin.xSync.reload();
-      this.plugin.xSync.xNotify.showNotification("#ffaa00", "Rebuilding index");
+      await this.plugin.xSync.v2.index.drop();
+      this.plugin.xSync.reload(0);
+      this.plugin.xSync.status.notify("rebuilding the index");
     }));
   }
+  hide() {
+    if (this.onStatus) {
+      this.plugin.xSync.status.off("change", this.onStatus);
+      this.onStatus = null;
+    }
+  }
 };
+async function testConnection(settings) {
+  if (!settings.host || !settings.password) {
+    return "Enter the host and the password first.";
+  }
+  const anysocket = new import_anysocket_browser3.default({ auth: { secret: settings.password, optional: true } });
+  const password = await Utils_default.getSHA(anysocket.id.substring(0, 16) + settings.password + anysocket.id.substring(16));
+  anysocket.authPacket = () => password;
+  anysocket.onAuth = async (packet) => await Utils_default.getSHA(packet.id.substring(0, 16) + settings.password + packet.id.substring(16)) == packet.auth;
+  try {
+    const peer = await anysocket.connect("ws", settings.host, settings.port, { connectTimeout: 1e4 });
+    await peer.e2e();
+    const info = peer.e2eInfo && peer.e2eInfo();
+    const modern = peer.protocolVersion && peer.protocolVersion() >= 1;
+    return "\u2713 Connected, encrypted" + (info && info.cipher ? " (" + info.cipher.toUpperCase() + ")" : "") + (modern ? "." : ". The server runs an older version (before 1.6.0); updating it is recommended.");
+  } catch (e) {
+    if (e && e.code === "ECONNFAILED") {
+      return "\u2717 The server refused the connection: the password is most likely wrong.";
+    }
+    return "\u2717 Can't reach " + settings.host + ":" + settings.port + ". Check the address, the port, and that the server is running.";
+  } finally {
+    anysocket.stop().catch(() => {
+    });
+  }
+}

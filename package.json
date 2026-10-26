@@ -13,6 +13,7 @@
 	},
 	"dependencies": {
 		"anysocket": "^1.0.1",
-		"node-cron": "^3.0.3"
+		"node-cron": "^3.0.3",
+		"node-diff3": "3.2.1"
 	}
 }

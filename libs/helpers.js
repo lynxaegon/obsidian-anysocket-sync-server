@@ -285,9 +285,15 @@ module.exports = {
         return path.split(/[\\/]/).every(part => part !== ".." && part !== "." && part !== "metadata");
     },
 
+    // by extension, case-insensitive ("Photo.PNG" is binary too)
     isBinary(path) {
-        path = path.split(".");
-        let extension = path[path.length - 1];
-        return this.binaryExtensions.indexOf(extension) !== -1;
+        let parts = path.split(".");
+        if (parts.length < 2) {
+            return false;
+        }
+        if (!this._binarySet) {
+            this._binarySet = new Set(this.binaryExtensions.map(e => e.toLowerCase()));
+        }
+        return this._binarySet.has(parts[parts.length - 1].toLowerCase());
     }
 }
