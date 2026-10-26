@@ -3,6 +3,10 @@
 // TODO: - IDEA: Server commands in Obsidian (cleanup)
 
 const fs = require("fs");
+if(parseInt(process.versions.node) < 20) {
+    console.log("Node.js 20 or newer is required (running " + process.version + ")");
+    return process.exit(-1);
+}
 if(!fs.existsSync("./config.js")) {
     console.log("Required \"./config.js\" is missing!\n");
 
@@ -17,6 +21,11 @@ lynxaegon/obsidian-anysocket-sync-server\n");
     console.log("\n\"./config.js\" example:\n", fs.readFileSync("./config.example.js", "utf8"));
     return process.exit(-1);
 }
+// a malformed packet from one connection must never take the server down
+process.on("unhandledRejection", (e) => {
+    console.error("[SERVER] Unhandled rejection:", e);
+});
+
 const config = require("./config");
 config.app_dir = __dirname;
 config.data_dir = "data";

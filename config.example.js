@@ -2,6 +2,11 @@ module.exports = {
     // server password
     "password": "default-server-password",
 
+    // allow clients older than 1.6.0 to connect (they are updated automatically on connect)
+    // set to false once all your devices run 1.6.0+, so every connection uses the stronger auth
+    // defaults to: true
+    "allow_legacy_clients": true,
+
     // listen on host/port
     "host": "0.0.0.0",
     "port": 3000,

@@ -273,6 +273,18 @@ module.exports = {
         "zipx"
     ],
 
+    // vault-relative paths only: no traversal, no absolute paths, and no
+    // "metadata" segment (it collides with the storage layout)
+    isSafePath(path) {
+        if(typeof path !== "string" || path.length === 0 || path.indexOf("\0") !== -1) {
+            return false;
+        }
+        if(/^([\\/]|[a-zA-Z]:)/.test(path)) {
+            return false;
+        }
+        return path.split(/[\\/]/).every(part => part !== ".." && part !== "." && part !== "metadata");
+    },
+
     isBinary(path) {
         path = path.split(".");
         let extension = path[path.length - 1];

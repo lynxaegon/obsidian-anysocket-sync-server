@@ -15,7 +15,18 @@ module.exports = class Server {
         this.getPeerList = () => peerList;
         this.setPeerList = (list) => { peerList = list; };
 
-        this.server = new AnySocket();
+        this.server = new AnySocket({
+            // anysocket 1.0 mutual auth (challenge/response, binds the e2e keys)
+            // optional: clients <= 1.5.x (anysocket 0.4) don't offer it and must still
+            // be able to connect to receive the auto-update
+            auth: {
+                secret: this.config.password,
+                optional: this.config.allow_legacy_clients !== false
+            },
+            // nothing is callable over an unencrypted link
+            rpcGuard: (peer) => peer.isE2EEnabled()
+        });
+        // legacy auth, still sent by every client so that old servers accept new clients
         this.server.onAuth = (packet) => {
             return packet.auth == Helpers.getSHA(packet.id.substring(0, 16) + this.config.password + packet.id.substring(16));
         };
@@ -23,6 +34,12 @@ module.exports = class Server {
             return Helpers.getSHA(this.server.id.substring(0, 16) + this.config.password + this.server.id.substring(16));
         };
 
+        const listenOptions = {
+            port: this.config.port,
+            // anysocket 1.0 drops a silent peer, ~60s budget
+            heartbeatInterval: 10 * 1000,
+            heartbeatsMaxMissed: 5
+        };
 
         // HTTPS
         if(this.config.certs) {
@@ -31,9 +48,14 @@ module.exports = class Server {
                 cert: this.config.certs.cert,
                 port: this.config.port,
                 host: this.config.host
-            });
+            }).catch(e => console.error("[SERVER] HTTPS listen failed:", e));
         }
-        this.server.listen("ws", this.config.port);
+        this.server.listen("ws", listenOptions).then(() => {
+            console.log("[SERVER] Listening on port " + this.config.port + (this.config.certs ? " (TLS)" : ""));
+        }).catch(e => {
+            console.error("[SERVER] Listen failed on port " + this.config.port + ":", e);
+            process.exit(1);
+        });
 
 
         this.server.on("connected", (peer) => {
@@ -67,8 +89,18 @@ module.exports = class Server {
             if(packet.msg == null)
                 return;
 
+            if(!packet.peer.isE2EEnabled()) {
+                return packet.peer.disconnect("Encryption required");
+            }
+
             if(!packet.peer.data || !packet.peer.data.id) {
                 return packet.peer.disconnect();
+            }
+
+            const data = packet.msg.data;
+            if(!data || (data.path !== undefined && !Helpers.isSafePath(data.path))) {
+                console.warn("[SERVER][" + packet.peer.data.id + "] Rejected unsafe path:", data && data.path);
+                return;
             }
 
             switch (packet.msg.type) {
@@ -158,6 +190,17 @@ module.exports = class Server {
         this.debug >= 2 && console.log("[SERVER][" + packet.peer.data.id + "] Started sync");
         packet.peer.data.syncing = true;
         packet.peer.data.files = {};
+
+        if(!Array.isArray(data)) {
+            data = [];
+        }
+        data = data.filter((item) => {
+            if(item && item.metadata && Helpers.isSafePath(item.path)) {
+                return true;
+            }
+            console.warn("[SERVER][" + packet.peer.data.id + "] Rejected unsafe sync item:", item && item.path);
+            return false;
+        });
 
         try {
             this.debug >= 3 && console.log("[SYNC]", data);
@@ -350,9 +393,17 @@ module.exports = class Server {
         this.debug >= 3 && console.log("[FileHistory]", data);
         switch (data.type) {
             case "list_versions":
+                let versionsMetadata = await XStorage.readMetadata(data.path);
+                if(!versionsMetadata) {
+                    // not on the server (yet)
+                    return packet.reply({
+                        deleted: false,
+                        data: []
+                    });
+                }
                 let versions = await XStorage.iterateVersions(data.path);
                 packet.reply({
-                    deleted: (await XStorage.readMetadata(data.path)).action == "deleted",
+                    deleted: versionsMetadata.action == "deleted",
                     data: versions.map(v => v.timestamp)
                 })
                 break;
@@ -385,6 +436,9 @@ module.exports = class Server {
             case "read":
                 if(!data.timestamp) {
                     return packet.reply(await XStorage.read(data.path));
+                }
+                if(!/^\d+$/.test(String(data.timestamp))) {
+                    return packet.reply(null);
                 }
                 if(data.binary) {
                     packet.reply(

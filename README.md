@@ -5,6 +5,8 @@
 ## Manual Setup
 _Important: **Always backup your vault!**_
 
+Requires **Node.js 20** or newer.
+
 * Download the latest release ([Releases](https://github.com/lynxaegon/obsidian-anysocket-sync-server/releases))
   * Or using git clone
     ```
