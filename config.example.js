@@ -1,5 +1,5 @@
 module.exports = {
-    // server password
+    // server password (the server won't start with this example one)
     "password": "default-server-password",
 
     // allow clients older than 1.6.0 to connect (they are updated automatically on connect)
@@ -35,8 +35,12 @@ module.exports = {
         // defaults to: 1000
         "versions_per_file": 1000,
 
+        // number of versions to keep for each binary file (images, PDFs, ...)
+        // defaults to: 3
+        "binary_versions_per_file": 3,
+
         // number of seconds to keep deleted files
-        //  - they will only be deleted if all connected devices have synced up to that file
+        //  - they will only be deleted once every approved device has synced since
         // defaults to: 3 days
         "keep_deleted_files_time": 3 * 24 * 60 * 60
     }

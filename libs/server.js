@@ -36,7 +36,7 @@ module.exports = class Server {
                 secret: this.config.password,
                 optional: this.config.allow_legacy_clients !== false
             },
-            rpcGuard: (peer, rpcPath) => this.canCall(peer, rpcPath)
+            rpcGuard: (peer, rpcPath, args) => this.canCall(peer, rpcPath, args)
         });
         // legacy auth, still sent by every client so that old servers accept new clients
         this.server.onAuth = (packet) => {
@@ -108,7 +108,7 @@ module.exports = class Server {
     }
 
     // which RPCs a connection may call, at its current stage
-    canCall(peer, rpcPath) {
+    canCall(peer, rpcPath, args) {
         if (!peer.isE2EEnabled()) {
             return false;
         }
@@ -121,7 +121,9 @@ module.exports = class Server {
             return true;
         }
         if (name === "hello") {
-            return !!data.versionOk;
+            // the plugin passes the version check first (so it gets updated); a headless client
+            // (obsidian-anysocket-sync-client) has no plugin to update and says what it is
+            return !!data.versionOk || !!(args && args[0] && args[0].kind === "client");
         }
         // 1.5.x clients only get this far when their version matches, which a 1.6.0 server never does
         if (name === "setDeviceId" || name === "autoSync") {
