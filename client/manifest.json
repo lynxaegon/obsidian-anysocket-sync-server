@@ -1,7 +1,7 @@
 {
 	"id": "anysocket-sync",
 	"name": "AnySocket Sync",
-	"version": "1.6.0",
+	"version": "1.6.1",
 	"minAppVersion": "0.15.0",
 	"description": "Self-hosted, encrypted sync for your vault, using AnySocket",
 	"author": "Andrei Vaduva",

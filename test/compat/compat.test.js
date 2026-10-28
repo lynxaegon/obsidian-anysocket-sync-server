@@ -13,6 +13,8 @@ const { ProductionServer, productionPlugin, productionBuildInfo } = require("./p
 const OLD_PLUGIN = productionPlugin();
 const NEW_BUILD = JSON.parse(fs.readFileSync(path.join(SERVER_DIR, "client", "build_info.json"), "utf8"));
 const OLD_BUILD = productionBuildInfo();
+// the version being released, as a regexp fragment
+const NEW_VERSION = NEW_BUILD.version.replace(/\./g, "\\.");
 const sha = (b) => crypto.createHash("sha256").update(b).digest("hex");
 const pluginFile = (device, name) => path.join(device.vaultDir, ".obsidian", "plugins", "anysocket-sync", name);
 
@@ -58,7 +60,7 @@ for (const anysocket of ["0.4.27", "0.4.32"]) {
         await device.start();
         await waitFor(async () => (await device.state()).plugins.enabled === 1, { message: "plugin swapped" });
         assert.equal(fs.readFileSync(pluginFile(device, "main.js"), "utf8"), fs.readFileSync(OLD_PLUGIN, "utf8"));
-        assert.match((await device.notices()).join("\n"), /older version, switched from 1\.6\.0 to 1\.5\.0/);
+        assert.match((await device.notices()).join("\n"), new RegExp("older version, switched from " + NEW_VERSION + " to 1\\.5\\.0"));
 
         // the 1.5.0 build it now runs syncs normally
         await reloadPushedPlugin(device);
@@ -129,7 +131,7 @@ test("the upgrade itself: a live 1.5 setup moves to 1.6.0 without losing or dupl
         await waitFor(async () => (await device.state()).plugins.enabled === 1, { message: device.name + " updated" });
         assert.equal(fs.readFileSync(pluginFile(device, "main.js"), "utf8"), fs.readFileSync(path.join(SERVER_DIR, "client", "main.js"), "utf8"));
         // 1.5.0 says it, right before Obsidian loads the new version
-        await waitFor(async () => (await device.notices()).some(n => /Updated to version: 1\.6\.0/.test(n)), { message: "update notice" });
+        await waitFor(async () => (await device.notices()).some(n => new RegExp("Updated to version: " + NEW_VERSION).test(n)), { message: "update notice" });
         await reloadPushedPlugin(device);
     }
     // devices that synced with the old server recently are approved on their own

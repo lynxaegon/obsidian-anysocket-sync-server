@@ -71,6 +71,10 @@ The commands work whether the server is running or not.
 - Once all your devices run 1.6.0, set `"allow_legacy_clients": false` in `config.js`, so every connection uses the stronger authentication.
 - Going back to 1.5.x works on the same data.
 
+## Coming in 1.7
+- Devices on 1.5.x or older won't be able to connect to a 1.7 server, so get every device on 1.6 before you update. 1.6 devices connect to 1.7 and update on their own, as usual.
+- The plugin connects only over TLS (wss) by default. If your server has no TLS (no `certs` and no reverse proxy), turn on "Allow insecure connection" in the plugin's settings after updating.
+
 
 ## Security
 - Use TLS when the server is reachable from the internet: either `certs` in `config.js`, or a reverse proxy in front of it. With nginx:
